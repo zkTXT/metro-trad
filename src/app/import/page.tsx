@@ -5,24 +5,35 @@ import type { Workbook } from "exceljs";
 import { Footer, Header } from "@/components/Chrome";
 import { checkProduct } from "@/lib/checker";
 import {
+  detecterModeleMetro,
   devinerColonnes,
   exporterClasseur,
+  exporterMetro,
+  exporterRapport,
   lireClasseur,
   lireEntetes,
   lireLignes,
-  nomsFeuilles,
+  lireLignesMetro,
+  type LigneMetro,
   type LigneSource,
+  type ModeleMetro,
   type ResultatLigne,
 } from "@/lib/excel";
-import { LANGUES } from "@/lib/translate";
+import { LANGUES, type LangCode } from "@/lib/translate";
 
 type StatutLigne =
   "attente" | "encours" | "valide" | "corrige" | "acorriger" | "erreur";
+
+type Ligne = LigneSource & {
+  ref?: string;
+  existant?: LigneMetro["existant"];
+};
 
 interface EtatLigne {
   statut: StatutLigne;
   res?: ResultatLigne;
   erreur?: string;
+  conservees?: string[]; // langues déjà remplies dans le fichier, non retraduites
 }
 
 const LIBELLES: Record<
@@ -105,10 +116,21 @@ function Section({
   );
 }
 
+function telecharger(blob: Blob, nom: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nom;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
 export default function ImportPage() {
   const [wb, setWb] = useState<Workbook | null>(null);
   const [nomFichier, setNomFichier] = useState("");
   const [feuille, setFeuille] = useState("");
+  const [metro, setMetro] = useState<ModeleMetro | null>(null);
+  const [ecraser, setEcraser] = useState(false);
   const [ligneEntete, setLigneEntete] = useState(1);
   const [colTitre, setColTitre] = useState(0);
   const [colDesc, setColDesc] = useState(0);
@@ -117,22 +139,31 @@ export default function ImportPage() {
   const [erreurFichier, setErreurFichier] = useState<string | null>(null);
   const [debut, setDebut] = useState(0);
   const [maintenant, setMaintenant] = useState(0);
-  const abortRef = useRef<AbortController | null>(null);
   const [durees, setDurees] = useState<number[]>([]);
+  const abortRef = useRef<AbortController | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const ws = useMemo(
     () => (wb && feuille ? (wb.getWorksheet(feuille) ?? null) : null),
     [wb, feuille],
   );
+  const colonnesOrigine = useMemo(
+    () => (ws ? Math.max(ws.actualColumnCount, ws.columnCount) : 0),
+    [ws],
+  );
   const entetes = useMemo(
-    () => (ws ? lireEntetes(ws, ligneEntete) : []),
-    [ws, ligneEntete],
+    () => (ws && !metro ? lireEntetes(ws, ligneEntete) : []),
+    [ws, metro, ligneEntete],
   );
-  const lignes: LigneSource[] = useMemo(
-    () => (ws ? lireLignes(ws, ligneEntete, colTitre, colDesc) : []),
-    [ws, ligneEntete, colTitre, colDesc],
-  );
+  const lignes: Ligne[] = useMemo(() => {
+    if (!ws) return [];
+    if (metro) return lireLignesMetro(ws, metro);
+    return lireLignes(ws, ligneEntete, colTitre, colDesc);
+  }, [ws, metro, ligneEntete, colTitre, colDesc]);
+
+  const feuillesVisibles = wb
+    ? wb.worksheets.filter((w) => w.state === "visible").map((w) => w.name)
+    : [];
 
   const compte = (f: (s: StatutLigne) => boolean) =>
     lignes.filter((l) => f(etats[l.numero]?.statut ?? "attente")).length;
@@ -147,27 +178,34 @@ export default function ImportPage() {
   const moyenne = recents.length
     ? recents.reduce((a, b) => a + b, 0) / recents.length
     : 0;
-  const restantes = lignes.length - nbTerminees;
-  const eta = running && moyenne ? moyenne * restantes : 0;
+  const eta = running && moyenne ? moyenne * (lignes.length - nbTerminees) : 0;
 
   function choisirFeuille(w: Workbook, nom: string) {
     const sheet = w.getWorksheet(nom);
     if (!sheet) return;
-    // Cherche la ligne d'en-têtes parmi les 10 premières.
-    let ligne = 1;
-    let devine = devinerColonnes(lireEntetes(sheet, 1));
-    for (let r = 1; r <= 10; r++) {
-      const d = devinerColonnes(lireEntetes(sheet, r));
-      if (d.titre || d.description) {
-        ligne = r;
-        devine = d;
-        break;
+    const m = detecterModeleMetro(sheet);
+    setMetro(m);
+    if (m) {
+      setLigneEntete(m.ligneEntete);
+      setColTitre(m.fr.titre);
+      setColDesc(m.fr.description);
+    } else {
+      // Cherche la ligne d'en-têtes parmi les 10 premières.
+      let ligne = 1;
+      let devine = devinerColonnes(lireEntetes(sheet, 1));
+      for (let r = 1; r <= 10; r++) {
+        const d = devinerColonnes(lireEntetes(sheet, r));
+        if (d.titre || d.description) {
+          ligne = r;
+          devine = d;
+          break;
+        }
       }
+      setLigneEntete(ligne);
+      setColTitre(devine.titre);
+      setColDesc(devine.description);
     }
     setFeuille(nom);
-    setLigneEntete(ligne);
-    setColTitre(devine.titre);
-    setColDesc(devine.description);
     setEtats({});
     setDurees([]);
   }
@@ -183,11 +221,11 @@ export default function ImportPage() {
     }
     try {
       const w = await lireClasseur(file);
-      if (w.worksheets.length === 0)
-        throw new Error("Le fichier ne contient aucune feuille.");
+      const premiere = w.worksheets.find((x) => x.state === "visible");
+      if (!premiere) throw new Error("Le fichier ne contient aucune feuille.");
       setWb(w);
       setNomFichier(file.name);
-      choisirFeuille(w, w.worksheets[0].name);
+      choisirFeuille(w, premiere.name);
     } catch (e) {
       setWb(null);
       setErreurFichier(
@@ -201,11 +239,12 @@ export default function ImportPage() {
   }
 
   async function traiterLigne(
-    l: LigneSource,
+    l: Ligne,
     signal: AbortSignal,
   ): Promise<EtatLigne> {
     const check = checkProduct(l.titre, l.description, "supprimer");
-    const problemes = [...check.titre.issues, ...check.description.issues]
+    const listeProblemes = [...check.titre.issues, ...check.description.issues];
+    const problemes = listeProblemes
       .map((i) => `${i.champ} : ${i.raison} (« ${i.extrait} »)`)
       .join("\n");
     const base = {
@@ -227,6 +266,37 @@ export default function ImportPage() {
       };
     }
 
+    // Langues à traduire. Dans le modèle Metro, on ne touche pas aux cases déjà
+    // remplies, sauf si le français a dû être corrigé (les anciennes traductions
+    // contiendraient encore le texte interdit) ou si « remplacer » est coché.
+    let cibles: string[] | undefined;
+    let conservees: string[] = [];
+    if (metro) {
+      const disponibles = LANGUES.map((x) => x.code as string).filter(
+        (c) => metro.langues[c as LangCode],
+      );
+      const manque = (c: string) => {
+        const e = l.existant?.[c as LangCode];
+        return (
+          (!!base.titreNettoye.trim() && !e?.titre.trim()) ||
+          (!!base.descriptionNettoyee.trim() && !e?.description.trim())
+        );
+      };
+      const aTraduire =
+        ecraser || listeProblemes.length > 0
+          ? disponibles
+          : disponibles.filter(manque);
+      cibles = aTraduire;
+      conservees = disponibles.filter((c) => !aTraduire.includes(c));
+      if (aTraduire.length === 0) {
+        return {
+          statut: statutVerdict,
+          res: { ...base, statut: LIBELLES[statutVerdict].export },
+          conservees,
+        };
+      }
+    }
+
     const r = await fetch("/api/translate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -234,6 +304,7 @@ export default function ImportPage() {
         titre: base.titreNettoye,
         description: base.descriptionNettoyee,
         import: true,
+        langues: cibles,
       }),
       signal,
     });
@@ -245,6 +316,7 @@ export default function ImportPage() {
     return {
       statut,
       res: { ...base, statut: LIBELLES[statut].export, traductions },
+      conservees,
       erreur: enErreur
         ? "Une ou plusieurs langues ont échoué : relancez pour les compléter."
         : undefined,
@@ -287,24 +359,58 @@ export default function ImportPage() {
     }
   }
 
-  function arreter() {
-    abortRef.current?.abort();
-  }
-
-  async function telecharger() {
-    if (!wb || !ws) return;
+  const resultats = () => {
     const map = new Map<number, ResultatLigne>();
     for (const l of lignes) {
       const res = etats[l.numero]?.res;
       if (res) map.set(l.numero, res);
     }
-    const blob = await exporterClasseur(wb, ws, ligneEntete, map);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = nomFichier.replace(/\.xlsx$/i, "") + " - traduit.xlsx";
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    return map;
+  };
+
+  async function telechargerFichier() {
+    if (!wb || !ws) return;
+    const blob = metro
+      ? await exporterMetro(wb, ws, metro, resultats())
+      : await exporterClasseur(
+          wb,
+          ws,
+          ligneEntete,
+          resultats(),
+          colonnesOrigine,
+        );
+    const base = nomFichier.replace(/\.xlsx$/i, "");
+    telecharger(blob, `${base} - ${metro ? "rempli" : "traduit"}.xlsx`);
+  }
+
+  async function telechargerRapport() {
+    const blob = await exporterRapport(
+      lignes
+        .filter((l) => etats[l.numero]?.res)
+        .map((l) => {
+          const e = etats[l.numero];
+          const langues = LANGUES.map((lg) => {
+            const t = e.res?.traductions?.[lg.code];
+            const etat = t
+              ? "error" in t
+                ? "erreur"
+                : "traduit"
+              : e.conservees?.includes(lg.code)
+                ? "déjà rempli"
+                : "—";
+            return `${BADGES[lg.code]} ${etat}`;
+          }).join(", ");
+          return {
+            numero: l.numero,
+            ref: l.ref ?? "",
+            titre: l.titre,
+            statut: e.res?.statut ?? "",
+            problemes: e.res?.problemes ?? "",
+            langues,
+          };
+        }),
+    );
+    telecharger(blob, nomFichier.replace(/\.xlsx$/i, "") + " - rapport.xlsx");
   }
 
   const peutExporter = Object.values(etats).some((e) => e.res);
@@ -329,8 +435,9 @@ export default function ImportPage() {
                 : "Glissez votre fichier Excel ici ou cliquez pour le choisir"}
             </span>
             <span className="text-xs text-slate-500">
-              Format .xlsx. Le fichier reste sur votre ordinateur : il
-              n&apos;est pas envoyé sur internet.
+              Format .xlsx (modèle d&apos;import Metro ou fichier libre). Le
+              fichier reste sur votre ordinateur : il n&apos;est pas envoyé sur
+              internet.
             </span>
             <input
               type="file"
@@ -351,9 +458,12 @@ export default function ImportPage() {
         </Section>
 
         {wb && ws && (
-          <Section step={2} title="Colonnes à traduire">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <label className="text-xs font-semibold text-slate-700">
+          <Section
+            step={2}
+            title={metro ? "Modèle Metro détecté" : "Colonnes à traduire"}
+          >
+            {feuillesVisibles.length > 1 && (
+              <label className="mb-4 block max-w-xs text-xs font-semibold text-slate-700">
                 Feuille
                 <select
                   className={`${selectClasses} mt-1`}
@@ -361,69 +471,116 @@ export default function ImportPage() {
                   disabled={running}
                   onChange={(e) => choisirFeuille(wb, e.target.value)}
                 >
-                  {nomsFeuilles(wb).map((n) => (
+                  {feuillesVisibles.map((n) => (
                     <option key={n}>{n}</option>
                   ))}
                 </select>
               </label>
-              <label className="text-xs font-semibold text-slate-700">
-                Ligne des en-têtes
-                <input
-                  type="number"
-                  min={1}
-                  className={`${selectClasses} mt-1`}
-                  value={ligneEntete}
-                  disabled={running}
-                  onChange={(e) => {
-                    setLigneEntete(Math.max(1, Number(e.target.value) || 1));
-                    setEtats({});
-                  }}
-                />
-              </label>
-              <label className="text-xs font-semibold text-slate-700">
-                Colonne du titre
-                <select
-                  className={`${selectClasses} mt-1`}
-                  value={colTitre}
-                  disabled={running}
-                  onChange={(e) => {
-                    setColTitre(Number(e.target.value));
-                    setEtats({});
-                  }}
-                >
-                  <option value={0}>(aucune)</option>
-                  {entetes.map((c) => (
-                    <option key={c.index} value={c.index}>
-                      {c.nom}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-xs font-semibold text-slate-700">
-                Colonne de la description
-                <select
-                  className={`${selectClasses} mt-1`}
-                  value={colDesc}
-                  disabled={running}
-                  onChange={(e) => {
-                    setColDesc(Number(e.target.value));
-                    setEtats({});
-                  }}
-                >
-                  <option value={0}>(aucune)</option>
-                  {entetes.map((c) => (
-                    <option key={c.index} value={c.index}>
-                      {c.nom}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
+            )}
+
+            {metro ? (
+              <div className="space-y-3 text-sm text-slate-700">
+                <div className="rounded-xl border border-green-300 bg-green-50 p-3.5 text-green-900">
+                  <p className="font-semibold">
+                    Le fichier suit le modèle d&apos;import Metro (en-têtes en
+                    ligne {metro.ligneEntete}).
+                  </p>
+                  <ul className="mt-1.5 list-inside list-disc space-y-0.5 text-[13px]">
+                    <li>
+                      Source : <strong>Product name FR</strong> et{" "}
+                      <strong>Description FR</strong> (nettoyés selon les règles
+                      Metro, puis réécrits dans les mêmes cases).
+                    </li>
+                    <li>
+                      Traductions écrites{" "}
+                      <strong>dans les colonnes existantes</strong> :{" "}
+                      {Object.keys(metro.langues)
+                        .map((c) => BADGES[c])
+                        .join(", ")}
+                      . Aucune colonne n&apos;est ajoutée au fichier.
+                    </li>
+                    <li>
+                      Les cases déjà remplies sont conservées, sauf si le
+                      français a dû être corrigé (les langues sont alors
+                      retraduites).
+                    </li>
+                  </ul>
+                </div>
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={ecraser}
+                    disabled={running}
+                    onChange={(e) => setEcraser(e.target.checked)}
+                    className="h-4 w-4 accent-[#003a80]"
+                  />
+                  Remplacer aussi les traductions déjà présentes dans le fichier
+                </label>
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-3">
+                <label className="text-xs font-semibold text-slate-700">
+                  Ligne des en-têtes
+                  <input
+                    type="number"
+                    min={1}
+                    className={`${selectClasses} mt-1`}
+                    value={ligneEntete}
+                    disabled={running}
+                    onChange={(e) => {
+                      setLigneEntete(Math.max(1, Number(e.target.value) || 1));
+                      setEtats({});
+                    }}
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-700">
+                  Colonne du titre
+                  <select
+                    className={`${selectClasses} mt-1`}
+                    value={colTitre}
+                    disabled={running}
+                    onChange={(e) => {
+                      setColTitre(Number(e.target.value));
+                      setEtats({});
+                    }}
+                  >
+                    <option value={0}>(aucune)</option>
+                    {entetes.map((c) => (
+                      <option key={c.index} value={c.index}>
+                        {c.nom}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs font-semibold text-slate-700">
+                  Colonne de la description
+                  <select
+                    className={`${selectClasses} mt-1`}
+                    value={colDesc}
+                    disabled={running}
+                    onChange={(e) => {
+                      setColDesc(Number(e.target.value));
+                      setEtats({});
+                    }}
+                  >
+                    <option value={0}>(aucune)</option>
+                    {entetes.map((c) => (
+                      <option key={c.index} value={c.index}>
+                        {c.nom}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
             <p className="mt-3 text-sm text-slate-600">
               <strong className="text-metro">{lignes.length}</strong> produit
               {lignes.length > 1 ? "s" : ""} détecté
               {lignes.length > 1 ? "s" : ""}.
-              {!colTitre && !colDesc && " Choisissez au moins une colonne."}
+              {!metro &&
+                !colTitre &&
+                !colDesc &&
+                " Choisissez au moins une colonne."}
             </p>
           </Section>
         )}
@@ -442,19 +599,30 @@ export default function ImportPage() {
                 </button>
               ) : (
                 <button
-                  onClick={arreter}
+                  onClick={() => abortRef.current?.abort()}
                   className="rounded-xl border-2 border-red-300 bg-white px-6 py-3 text-base font-bold text-red-700 hover:bg-red-50"
                 >
                   Arrêter
                 </button>
               )}
               <button
-                onClick={telecharger}
+                onClick={telechargerFichier}
                 disabled={!peutExporter}
                 className="rounded-xl bg-metro px-6 py-3 text-base font-bold text-white transition hover:bg-metro-dark disabled:opacity-40"
               >
-                Télécharger l&apos;Excel ↓
+                {metro
+                  ? "Télécharger le fichier Metro ↓"
+                  : "Télécharger l'Excel ↓"}
               </button>
+              {metro && (
+                <button
+                  onClick={telechargerRapport}
+                  disabled={!peutExporter}
+                  className="rounded-xl border-2 border-metro bg-white px-5 py-3 text-base font-bold text-metro transition hover:bg-blue-50 disabled:opacity-40"
+                >
+                  Rapport ↓
+                </button>
+              )}
               <span className="text-xs text-slate-500">
                 {running
                   ? "Ne fermez pas cette page pendant la traduction."
@@ -516,7 +684,7 @@ export default function ImportPage() {
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-3 py-2">Ligne</th>
-                    <th className="px-3 py-2">Titre</th>
+                    <th className="px-3 py-2">Produit</th>
                     <th className="px-3 py-2">Statut</th>
                     <th className="px-3 py-2">Problèmes</th>
                     <th className="px-3 py-2">Langues</th>
@@ -534,12 +702,18 @@ export default function ImportPage() {
                     return (
                       <tr key={l.numero} className="text-slate-800">
                         <td className="px-3 py-2 text-slate-500">{l.numero}</td>
-                        <td
-                          className="max-w-md truncate px-3 py-2"
-                          title={l.titre}
-                        >
-                          {l.titre || (
-                            <span className="text-slate-400">(sans titre)</span>
+                        <td className="max-w-md px-3 py-2">
+                          <div className="truncate" title={l.titre}>
+                            {l.titre || (
+                              <span className="text-slate-400">
+                                (sans titre)
+                              </span>
+                            )}
+                          </div>
+                          {l.ref && (
+                            <div className="text-xs text-slate-400">
+                              {l.ref}
+                            </div>
                           )}
                         </td>
                         <td className="px-3 py-2">
@@ -568,15 +742,30 @@ export default function ImportPage() {
                           <div className="flex gap-1">
                             {LANGUES.map((lg) => {
                               const t = e.res?.traductions?.[lg.code];
-                              const cls = !t
-                                ? "bg-slate-100 text-slate-400"
-                                : "error" in t
+                              const gardee = e.conservees?.includes(lg.code);
+                              const absente = metro && !metro.langues[lg.code];
+                              const cls = t
+                                ? "error" in t
                                   ? "bg-red-100 text-red-700"
-                                  : "bg-green-100 text-green-800";
+                                  : "bg-green-100 text-green-800"
+                                : gardee
+                                  ? "bg-sky-100 text-sky-800"
+                                  : "bg-slate-100 text-slate-400";
                               return (
                                 <span
                                   key={lg.code}
-                                  className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${cls}`}
+                                  title={
+                                    absente
+                                      ? "Colonne absente du fichier"
+                                      : t
+                                        ? "error" in t
+                                          ? "Erreur"
+                                          : "Traduit"
+                                        : gardee
+                                          ? "Déjà rempli, conservé"
+                                          : ""
+                                  }
+                                  className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${cls} ${absente ? "line-through" : ""}`}
                                 >
                                   {BADGES[lg.code]}
                                 </span>
@@ -596,6 +785,20 @@ export default function ImportPage() {
                 </p>
               )}
             </div>
+            <p className="mt-2 text-xs text-slate-500">
+              <span className="rounded bg-green-100 px-1.5 py-0.5 font-bold text-green-800">
+                XX
+              </span>{" "}
+              traduit ·{" "}
+              <span className="rounded bg-sky-100 px-1.5 py-0.5 font-bold text-sky-800">
+                XX
+              </span>{" "}
+              déjà rempli dans le fichier, conservé ·{" "}
+              <span className="rounded bg-red-100 px-1.5 py-0.5 font-bold text-red-700">
+                XX
+              </span>{" "}
+              erreur
+            </p>
           </Section>
         )}
       </main>

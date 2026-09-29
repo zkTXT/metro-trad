@@ -8,17 +8,27 @@ export async function POST(request: Request) {
     description?: unknown;
     sansMemoire?: unknown;
     import?: unknown;
+    langues?: unknown;
   } | null;
 
   const titre = typeof body?.titre === "string" ? body.titre : "";
   const description =
     typeof body?.description === "string" ? body.description : "";
   const sansMemoire = body?.sansMemoire === true;
+  const demandees = Array.isArray(body?.langues)
+    ? body.langues.filter((x): x is string => typeof x === "string")
+    : null;
+  const cibles = LANGUES.filter(
+    (l) => !demandees || demandees.includes(l.code),
+  );
   // Import Excel : on ralentit fortement pour ne pas se faire bloquer par Google.
   const cooldownMs = body?.import === true ? 4000 : 300;
 
   if (!titre.trim() && !description.trim()) {
     return Response.json({ error: "Aucun texte à traduire" }, { status: 400 });
+  }
+  if (cibles.length === 0) {
+    return Response.json({ error: "Aucune langue demandée" }, { status: 400 });
   }
   if (titre.length > 5000 || description.length > 20000) {
     return Response.json({ error: "Texte trop long" }, { status: 413 });
@@ -38,7 +48,7 @@ export async function POST(request: Request) {
   const glossaire = await lireGlossaire();
 
   // 3 langues en parallèle au maximum, pour rester poli avec les services gratuits.
-  const file = [...LANGUES];
+  const file = [...cibles];
   const worker = async () => {
     for (let l = file.shift(); l; l = file.shift()) {
       const { code } = l;

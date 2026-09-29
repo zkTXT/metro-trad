@@ -83,8 +83,9 @@ export async function exporterClasseur(
   ws: Worksheet,
   ligneEntete: number,
   resultats: Map<number, ResultatLigne>,
+  colonnesOrigine: number,
 ): Promise<Blob> {
-  const debut = Math.max(ws.actualColumnCount, ws.columnCount) + 1;
+  const debut = colonnesOrigine + 1;
   const colonnes: {
     titre: string;
     valeur: (r: ResultatLigne) => string;
@@ -141,4 +142,156 @@ export async function exporterClasseur(
   return new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
+}
+
+// ---------------------------------------------------------------------------
+// Modèle d'import Metro : une colonne « Product name XX » et « Description XX »
+// par langue. On remplit ces cases en place (aucune colonne n'est ajoutée).
+// ---------------------------------------------------------------------------
+
+const SUFFIXES: Record<string, LangCode | "fr"> = {
+  FR: "fr",
+  DE: "de",
+  HR: "hr",
+  ES: "es",
+  IT: "it",
+  NL: "nl",
+  PT: "pt-PT",
+};
+
+export interface ModeleMetro {
+  ligneEntete: number;
+  fr: { titre: number; description: number };
+  langues: Partial<Record<LangCode, { titre: number; description: number }>>;
+  colRef: number; // MPN / GTIN / MID, pour l'affichage
+}
+
+export function detecterModeleMetro(ws: Worksheet): ModeleMetro | null {
+  const largeur = Math.max(ws.actualColumnCount, ws.columnCount);
+  for (let r = 1; r <= Math.min(20, ws.rowCount); r++) {
+    const row = ws.getRow(r);
+    const titres: Record<string, number> = {};
+    const descriptions: Record<string, number> = {};
+    let ref = 0;
+    for (let c = 1; c <= largeur; c++) {
+      const t = texte(row.getCell(c));
+      const m = t.match(/^(Product name|Description) ([A-Z]{2})$/i);
+      if (m) {
+        const cible =
+          m[1].toLowerCase() === "description" ? descriptions : titres;
+        const k = m[2].toUpperCase();
+        if (!cible[k]) cible[k] = c;
+      }
+      if (!ref && /^(MPN|GTIN|MID)$/i.test(t)) ref = c;
+    }
+    if (titres.FR && descriptions.FR) {
+      const langues: ModeleMetro["langues"] = {};
+      for (const [suffixe, code] of Object.entries(SUFFIXES)) {
+        if (code === "fr") continue;
+        if (titres[suffixe] && descriptions[suffixe]) {
+          langues[code as LangCode] = {
+            titre: titres[suffixe],
+            description: descriptions[suffixe],
+          };
+        }
+      }
+      return {
+        ligneEntete: r,
+        fr: { titre: titres.FR, description: descriptions.FR },
+        langues,
+        colRef: ref,
+      };
+    }
+  }
+  return null;
+}
+
+export interface LigneMetro extends LigneSource {
+  ref: string;
+  existant: Partial<Record<LangCode, { titre: string; description: string }>>;
+}
+
+export function lireLignesMetro(ws: Worksheet, m: ModeleMetro): LigneMetro[] {
+  const out: LigneMetro[] = [];
+  for (let r = m.ligneEntete + 1; r <= ws.rowCount; r++) {
+    const row = ws.getRow(r);
+    const titre = texte(row.getCell(m.fr.titre));
+    const description = texte(row.getCell(m.fr.description));
+    if (!titre && !description) continue;
+    const existant: LigneMetro["existant"] = {};
+    for (const [code, cols] of Object.entries(m.langues)) {
+      existant[code as LangCode] = {
+        titre: texte(row.getCell(cols.titre)),
+        description: texte(row.getCell(cols.description)),
+      };
+    }
+    out.push({
+      numero: r,
+      titre,
+      description,
+      ref: m.colRef ? texte(row.getCell(m.colRef)) : "",
+      existant,
+    });
+  }
+  return out;
+}
+
+const XLSX_TYPE =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+// Remplit le modèle Metro : français nettoyé + traductions, dans les bonnes cases.
+export async function exporterMetro(
+  wb: Workbook,
+  ws: Worksheet,
+  m: ModeleMetro,
+  resultats: Map<number, ResultatLigne>,
+): Promise<Blob> {
+  for (const [numero, res] of resultats) {
+    const row = ws.getRow(numero);
+    row.getCell(m.fr.titre).value = res.titreNettoye || null;
+    row.getCell(m.fr.description).value = res.descriptionNettoyee || null;
+    for (const [code, t] of Object.entries(res.traductions ?? {})) {
+      const cols = m.langues[code as LangCode];
+      if (!cols || "error" in t) continue;
+      row.getCell(cols.titre).value = t.titre || null;
+      row.getCell(cols.description).value = t.description || null;
+    }
+  }
+  return new Blob([await wb.xlsx.writeBuffer()], { type: XLSX_TYPE });
+}
+
+export interface LigneRapport {
+  numero: number;
+  ref: string;
+  titre: string;
+  statut: string;
+  problemes: string;
+  langues: string;
+}
+
+// Rapport séparé (le fichier Metro, lui, ne reçoit aucune colonne en plus).
+export async function exporterRapport(lignes: LigneRapport[]): Promise<Blob> {
+  const ExcelJS = (await import("exceljs")).default;
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Rapport");
+  ws.columns = [
+    { header: "Ligne", key: "numero", width: 8 },
+    { header: "Référence", key: "ref", width: 18 },
+    { header: "Titre (FR d'origine)", key: "titre", width: 55 },
+    { header: "Statut Metro", key: "statut", width: 34 },
+    { header: "Problèmes détectés", key: "problemes", width: 70 },
+    { header: "Langues", key: "langues", width: 42 },
+  ];
+  ws.getRow(1).font = { bold: true, color: { argb: "FF003A80" } };
+  ws.getRow(1).fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFFFD200" },
+  };
+  for (const l of lignes) {
+    const row = ws.addRow(l);
+    row.alignment = { vertical: "top", wrapText: true };
+  }
+  ws.views = [{ state: "frozen", ySplit: 1 }];
+  return new Blob([await wb.xlsx.writeBuffer()], { type: XLSX_TYPE });
 }
