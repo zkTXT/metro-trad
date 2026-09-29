@@ -9,7 +9,7 @@
   ],
   "phrasesInterdites": [
     {
-      "motif": "existe (aussi )?(en|dans)",
+      "motif": "(existe|existent)\\b|(également|aussi|par ailleurs|sinon) disponibles?|disponibles? (également|aussi)|(également|aussi) (proposé|commercialisé|décliné|livrable)e?s?|(proposé|décliné)e?s? (également|aussi|en)\\b|déclinaisons?|variantes?",
       "raison": "Variante du produit mentionnée",
       "categorie": "variante"
     },
