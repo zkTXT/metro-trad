@@ -16,19 +16,28 @@ export async function POST(request: Request) {
     return Response.json({ error: "Texte trop long" }, { status: 413 });
   }
 
-  const results = await Promise.all(
-    LANGUES.map(async ({ code }) => {
-      try {
-        const [t, d] = await Promise.all([
-          translateText(titre, code),
-          translateText(description, code),
-        ]);
-        return [code, { titre: t, description: d }] as const;
-      } catch {
-        return [code, { error: "La traduction a échoué, réessayez." }] as const;
-      }
-    }),
-  );
+  // Les langues sont traitées l'une après l'autre pour ne pas se faire bloquer
+  // (429) par le service gratuit.
+  const traductions: Record<
+    string,
+    { titre: string; description: string } | { error: string }
+  > = {};
 
-  return Response.json({ traductions: Object.fromEntries(results) });
+  for (const { code } of LANGUES) {
+    try {
+      const t = await translateText(titre, code);
+      const d = await translateText(description, code);
+      traductions[code] = { titre: t, description: d };
+    } catch (e) {
+      console.error(`[translate] ${code} :`, e);
+      traductions[code] = {
+        error:
+          "Le service de traduction gratuit est temporairement saturé. Patientez une à deux minutes puis réessayez. (" +
+          (e instanceof Error ? e.message : "erreur inconnue") +
+          ")",
+      };
+    }
+  }
+
+  return Response.json({ traductions });
 }
