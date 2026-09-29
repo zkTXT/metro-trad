@@ -1,6 +1,7 @@
 // Lecture / écriture des fichiers Excel, entièrement dans le navigateur
 // (le fichier n'est jamais envoyé au serveur).
 import type { Workbook, Worksheet } from "exceljs";
+import { CONSIGNES_SECURITE } from "./consignes";
 import { LANGUES, type LangCode } from "./translate";
 
 export interface Colonne {
@@ -164,6 +165,7 @@ export interface ModeleMetro {
   fr: { titre: number; description: number };
   langues: Partial<Record<LangCode, { titre: number; description: number }>>;
   colRef: number; // MPN / GTIN / MID, pour l'affichage
+  securite: Partial<Record<"fr" | LangCode, number>>; // « Product safety instructions XX »
 }
 
 export function detecterModeleMetro(ws: Worksheet): ModeleMetro | null {
@@ -173,8 +175,14 @@ export function detecterModeleMetro(ws: Worksheet): ModeleMetro | null {
     const titres: Record<string, number> = {};
     const descriptions: Record<string, number> = {};
     let ref = 0;
+    const securite: ModeleMetro["securite"] = {};
     for (let c = 1; c <= largeur; c++) {
       const t = texte(row.getCell(c));
+      const sec = t.match(/^Product safety instructions ([A-Z]{2})$/i);
+      if (sec) {
+        const code = SUFFIXES[sec[1].toUpperCase()];
+        if (code && !securite[code]) securite[code] = c;
+      }
       const m = t.match(/^(Product name|Description) ([A-Z]{2})$/i);
       if (m) {
         const cible =
@@ -200,6 +208,7 @@ export function detecterModeleMetro(ws: Worksheet): ModeleMetro | null {
         fr: { titre: titres.FR, description: descriptions.FR },
         langues,
         colRef: ref,
+        securite,
       };
     }
   }
@@ -245,7 +254,18 @@ export async function exporterMetro(
   ws: Worksheet,
   m: ModeleMetro,
   resultats: Map<number, ResultatLigne>,
+  opts: { consignes?: { lignes: number[] } } = {},
 ): Promise<Blob> {
+  // Consignes de sécurité standard : ajoutées dans les cases vides, jamais par-dessus
+  // un texte déjà présent.
+  for (const numero of opts.consignes?.lignes ?? []) {
+    const row = ws.getRow(numero);
+    for (const [code, col] of Object.entries(m.securite)) {
+      const cell = row.getCell(col as number);
+      if (!texte(cell))
+        cell.value = CONSIGNES_SECURITE[code as "fr" | LangCode];
+    }
+  }
   for (const [numero, res] of resultats) {
     const row = ws.getRow(numero);
     row.getCell(m.fr.titre).value = res.titreNettoye || null;

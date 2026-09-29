@@ -131,6 +131,7 @@ export default function ImportPage() {
   const [feuille, setFeuille] = useState("");
   const [metro, setMetro] = useState<ModeleMetro | null>(null);
   const [ecraser, setEcraser] = useState(false);
+  const [consignes, setConsignes] = useState(true);
   const [ligneEntete, setLigneEntete] = useState(1);
   const [colTitre, setColTitre] = useState(0);
   const [colDesc, setColDesc] = useState(0);
@@ -371,7 +372,12 @@ export default function ImportPage() {
   async function telechargerFichier() {
     if (!wb || !ws) return;
     const blob = metro
-      ? await exporterMetro(wb, ws, metro, resultats())
+      ? await exporterMetro(wb, ws, metro, resultats(), {
+          consignes:
+            consignes && Object.keys(metro.securite).length > 0
+              ? { lignes: lignes.map((l) => l.numero) }
+              : undefined,
+        })
       : await exporterClasseur(
           wb,
           ws,
@@ -516,6 +522,24 @@ export default function ImportPage() {
                   />
                   Remplacer aussi les traductions déjà présentes dans le fichier
                 </label>
+                {Object.keys(metro.securite).length > 0 && (
+                  <label className="flex cursor-pointer items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={consignes}
+                      onChange={(e) => setConsignes(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 accent-[#003a80]"
+                    />
+                    <span>
+                      Ajouter les <strong>consignes de sécurité</strong>{" "}
+                      standard dans les cases « Product safety instructions » (
+                      {Object.keys(metro.securite)
+                        .map((c) => (c === "fr" ? "FR" : BADGES[c]))
+                        .join(", ")}
+                      ). Les cases déjà remplies ne sont pas modifiées.
+                    </span>
+                  </label>
+                )}
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-3">
