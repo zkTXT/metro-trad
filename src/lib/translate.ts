@@ -21,18 +21,24 @@ const GOOGLE_MAX = 4000;
 let googlePauseJusqua = 0;
 let sondeEnCours = false;
 const PAUSE_GOOGLE_MS = 2 * 60 * 1000;
+const PAUSE_GOOGLE_MAX_MS = 30 * 60 * 1000;
+let niveauPause = 0; // double après chaque blocage consécutif, remis à 0 au premier succès
 
 // Espace les requêtes envoyées à Google (~300 ms) pour rester sous son seuil.
 const ESPACEMENT_MS = 300;
 let fileEnvois: Promise<void> = Promise.resolve();
-function espacer(): Promise<void> {
-  const p = fileEnvois.then(() => sleep(ESPACEMENT_MS));
+function espacer(ms: number): Promise<void> {
+  const p = fileEnvois.then(() => sleep(ms));
   fileEnvois = p;
   return p;
 }
 
-async function googleOnce(text: string, to: string): Promise<string> {
-  await espacer();
+async function googleOnce(
+  text: string,
+  to: string,
+  cooldownMs: number,
+): Promise<string> {
+  await espacer(cooldownMs);
   const res = await fetch(GOOGLE, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -46,7 +52,10 @@ async function googleOnce(text: string, to: string): Promise<string> {
     signal: AbortSignal.timeout(15000),
   });
   if (res.status === 429) {
-    googlePauseJusqua = Date.now() + PAUSE_GOOGLE_MS;
+    googlePauseJusqua =
+      Date.now() +
+      Math.min(PAUSE_GOOGLE_MS * 2 ** niveauPause, PAUSE_GOOGLE_MAX_MS);
+    niveauPause++;
     throw new Error("Google HTTP 429");
   }
   if (!res.ok) throw new Error(`Google HTTP ${res.status}`);
@@ -54,24 +63,33 @@ async function googleOnce(text: string, to: string): Promise<string> {
   return data[0].map((seg) => seg[0]).join("");
 }
 
-async function google(text: string, to: string): Promise<string> {
+async function google(
+  text: string,
+  to: string,
+  cooldownMs: number,
+): Promise<string> {
   if (Date.now() < googlePauseJusqua) throw new Error("Google en pause (429)");
   if (googlePauseJusqua > 0) {
     // Pause écoulée : une seule requête d'essai, les autres restent sur MyMemory.
     if (sondeEnCours) throw new Error("Google en pause (essai en cours)");
     sondeEnCours = true;
     try {
-      const r = await googleTexte(text, to);
+      const r = await googleTexte(text, to, cooldownMs);
       googlePauseJusqua = 0;
+      niveauPause = 0;
       return r;
     } finally {
       sondeEnCours = false;
     }
   }
-  return googleTexte(text, to);
+  return googleTexte(text, to, cooldownMs);
 }
 
-async function googleTexte(text: string, to: string): Promise<string> {
+async function googleTexte(
+  text: string,
+  to: string,
+  cooldownMs: number,
+): Promise<string> {
   // Les textes très longs sont coupés par paragraphe.
   const parts: string[] = [];
   let cur = "";
@@ -91,7 +109,7 @@ async function googleTexte(text: string, to: string): Promise<string> {
     let done = false;
     for (let attempt = 0; attempt < 2 && !done; attempt++) {
       try {
-        out.push(await googleOnce(p, to));
+        out.push(await googleOnce(p, to, cooldownMs));
         done = true;
       } catch (e) {
         lastError = e;
@@ -203,13 +221,19 @@ async function myMemory(text: string, to: string): Promise<string> {
 
 // ---------- API publique ----------
 
+export interface OptionsMoteur {
+  /** Délai entre deux requêtes envoyées à Google (ms). */
+  cooldownMs?: number;
+}
+
 export async function traduireBrut(
   text: string,
   to: LangCode,
+  opts: OptionsMoteur = {},
 ): Promise<string> {
   if (!text.trim()) return "";
   try {
-    return await google(text, to);
+    return await google(text, to, opts.cooldownMs ?? ESPACEMENT_MS);
   } catch (googleError) {
     try {
       return await myMemory(text, to);

@@ -1,6 +1,6 @@
 import { promises as fs } from "fs";
 import path from "path";
-import { traduireBrut, type LangCode } from "./translate";
+import { traduireBrut, type LangCode, type OptionsMoteur } from "./translate";
 
 // Mémoire des traductions : chaque phrase déjà traduite est gardée (par langue) et
 // n'est plus renvoyée aux moteurs gratuits. Stockée dans data/memoire.json.
@@ -66,33 +66,43 @@ export interface ResultatMemoire {
   nouvelles: number; // phrases envoyées aux moteurs
 }
 
-export async function traduireAvecMemoire(
-  text: string,
+export interface OptionsMemoire extends OptionsMoteur {
+  sansMemoire?: boolean;
+}
+
+// Traduit plusieurs textes (ex. titre + description) avec UNE seule requête aux
+// moteurs pour toutes les phrases manquantes.
+export async function traduireTextes(
+  textes: string[],
   to: LangCode,
-  opts: { sansMemoire?: boolean } = {},
-): Promise<ResultatMemoire> {
-  if (!text.trim()) return { texte: "", reprises: 0, nouvelles: 0 };
+  opts: OptionsMemoire = {},
+): Promise<ResultatMemoire[]> {
   const memoire = await charger();
 
-  const lignes = text.split("\n").map((l) => (l.trim() ? phrases(l) : null));
-  const uniques = new Set(lignes.flatMap((l) => l ?? []));
-
+  const decoupes = textes.map((t) =>
+    t.split("\n").map((l) => (l.trim() ? phrases(l) : null)),
+  );
+  const uniques = new Set(
+    decoupes.flatMap((lignes) => lignes.flatMap((l) => l ?? [])),
+  );
   const manquantes = [...uniques].filter(
     (p) => opts.sansMemoire || !memoire.has(cle(to, p)),
   );
   const manquantesSet = new Set(manquantes);
 
   if (manquantes.length > 0) {
-    // Un seul envoi pour toutes les phrases manquantes (une phrase par ligne).
-    const brut = (await traduireBrut(manquantes.join("\n"), to)).split("\n");
+    // Une phrase par ligne dans un seul envoi.
+    const brut = (await traduireBrut(manquantes.join("\n"), to, opts)).split(
+      "\n",
+    );
     const traduites =
       brut.length === manquantes.length
         ? brut
-        : await Promise.all(manquantes.map((m) => traduireBrut(m, to)));
+        : await Promise.all(manquantes.map((m) => traduireBrut(m, to, opts)));
     for (let i = 0; i < manquantes.length; i++) {
       const p = manquantes[i];
       let t = traduites[i]?.trim();
-      if (!t) t = (await traduireBrut(p, to)).trim(); // un moteur renvoie parfois du vide
+      if (!t) t = (await traduireBrut(p, to, opts)).trim(); // un moteur renvoie parfois du vide
       if (!t) throw new Error(`Traduction vide pour « ${p} »`);
       memoire.set(cle(to, p), t);
     }
@@ -102,18 +112,29 @@ export async function traduireAvecMemoire(
     }
   }
 
-  let reprises = 0;
-  const texte = lignes
-    .map((l) => {
-      if (!l) return "";
-      return l
-        .map((p) => {
-          if (!manquantesSet.has(p)) reprises++;
-          return memoire.get(cle(to, p)) as string;
-        })
-        .join(" ");
-    })
-    .join("\n");
+  return decoupes.map((lignes) => {
+    let reprises = 0;
+    let nouvelles = 0;
+    const texte = lignes
+      .map((l) => {
+        if (!l) return "";
+        return l
+          .map((p) => {
+            if (manquantesSet.has(p)) nouvelles++;
+            else reprises++;
+            return memoire.get(cle(to, p)) as string;
+          })
+          .join(" ");
+      })
+      .join("\n");
+    return { texte, reprises, nouvelles };
+  });
+}
 
-  return { texte, reprises, nouvelles: manquantes.length };
+export async function traduireAvecMemoire(
+  text: string,
+  to: LangCode,
+  opts: OptionsMemoire = {},
+): Promise<ResultatMemoire> {
+  return (await traduireTextes([text], to, opts))[0];
 }

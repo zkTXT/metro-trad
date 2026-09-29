@@ -1,5 +1,5 @@
 import { appliquerGlossaire, lireGlossaire } from "@/lib/glossaire";
-import { sauverMemoire, traduireAvecMemoire } from "@/lib/memoire";
+import { sauverMemoire, traduireTextes } from "@/lib/memoire";
 import { LANGUES } from "@/lib/translate";
 
 export async function POST(request: Request) {
@@ -7,12 +7,15 @@ export async function POST(request: Request) {
     titre?: unknown;
     description?: unknown;
     sansMemoire?: unknown;
+    import?: unknown;
   } | null;
 
   const titre = typeof body?.titre === "string" ? body.titre : "";
   const description =
     typeof body?.description === "string" ? body.description : "";
   const sansMemoire = body?.sansMemoire === true;
+  // Import Excel : on ralentit fortement pour ne pas se faire bloquer par Google.
+  const cooldownMs = body?.import === true ? 4000 : 300;
 
   if (!titre.trim() && !description.trim()) {
     return Response.json({ error: "Aucun texte à traduire" }, { status: 400 });
@@ -40,8 +43,10 @@ export async function POST(request: Request) {
     for (let l = file.shift(); l; l = file.shift()) {
       const { code } = l;
       try {
-        const t = await traduireAvecMemoire(titre, code, { sansMemoire });
-        const d = await traduireAvecMemoire(description, code, { sansMemoire });
+        const [t, d] = await traduireTextes([titre, description], code, {
+          sansMemoire,
+          cooldownMs,
+        });
         // Le glossaire s'applique après la mémoire : une correction agit tout de suite.
         const gt = appliquerGlossaire(t.texte, code, glossaire);
         const gd = appliquerGlossaire(d.texte, code, glossaire);
