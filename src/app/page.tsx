@@ -12,6 +12,7 @@ const BADGES: Record<string, string> = {
   it: "IT",
   "pt-PT": "PT",
   hr: "HR",
+  nl: "NL",
 };
 
 function CopyBox({ label, text }: { label: string; text: string }) {
@@ -72,7 +73,10 @@ function Card({
   );
 }
 
-const VERDICTS: Record<Verdict, { label: string; icon: string; classes: string }> = {
+const VERDICTS: Record<
+  Verdict,
+  { label: string; icon: string; classes: string }
+> = {
   valide: {
     label: "Validé : aucun problème détecté",
     icon: "✓",
@@ -97,8 +101,14 @@ export default function Home() {
   const [titre, setTitre] = useState("");
   const [description, setDescription] = useState("");
   const [mode, setMode] = useState<Mode>("supprimer");
-  const [traductions, setTraductions] = useState<Record<string, Traduction> | null>(null);
-  const [source, setSource] = useState<{ titre: string; description: string } | null>(null);
+  const [traductions, setTraductions] = useState<Record<
+    string,
+    Traduction
+  > | null>(null);
+  const [source, setSource] = useState<{
+    titre: string;
+    description: string;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -114,7 +124,8 @@ export default function Home() {
   };
   const obsolete =
     source !== null &&
-    (source.titre !== textes.titre || source.description !== textes.description);
+    (source.titre !== textes.titre ||
+      source.description !== textes.description);
   const verdict = VERDICTS[result.verdict];
 
   async function traduire() {
@@ -140,7 +151,7 @@ export default function Home() {
   return (
     <>
       <header className="bg-metro text-white">
-        <div className="mx-auto flex max-w-4xl items-center gap-4 px-5 py-5">
+        <div className="mx-auto flex max-w-7xl items-center gap-4 px-5 py-5">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-sun text-xl font-black text-metro-dark">
             M
           </div>
@@ -149,20 +160,25 @@ export default function Home() {
               Metro Trad
             </h1>
             <p className="text-sm text-blue-100">
-              Vérifiez, nettoyez et traduisez vos fiches produit avant l&apos;envoi
+              Vérifiez, nettoyez et traduisez vos fiches produit avant
+              l&apos;envoi
             </p>
           </div>
         </div>
         <div className="h-1.5 bg-sun" />
       </header>
 
-      <main className="mx-auto w-full max-w-4xl space-y-5 px-4 py-6 sm:px-5">
+      <main className="mx-auto w-full max-w-7xl space-y-5 px-4 py-6 sm:px-5">
         <Card step={1} title="Fiche produit en français">
           <div className="space-y-4">
             <label className="block">
               <div className="mb-1.5 flex items-baseline justify-between">
-                <span className="text-sm font-semibold text-slate-800">Titre</span>
-                <span className="text-xs text-slate-500">{titre.length} caractères</span>
+                <span className="text-sm font-semibold text-slate-800">
+                  Titre
+                </span>
+                <span className="text-xs text-slate-500">
+                  {titre.length} caractères
+                </span>
               </div>
               <input
                 className={inputClasses}
@@ -256,7 +272,9 @@ export default function Home() {
 
                 {result.messageMetro && (
                   <p className="rounded-lg border border-sun-dark/40 bg-yellow-50 p-3 text-sm leading-relaxed text-slate-800">
-                    <strong className="text-metro">Message type Metro : </strong>
+                    <strong className="text-metro">
+                      Message type Metro :{" "}
+                    </strong>
                     {result.messageMetro}
                   </p>
                 )}
@@ -279,10 +297,13 @@ export default function Home() {
                     disabled={loading || result.verdict === "refuse"}
                     className="rounded-xl bg-sun px-6 py-3 text-base font-extrabold text-metro-dark shadow-sm transition hover:bg-sun-dark disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {loading ? "Traduction en cours…" : "Traduire dans les 5 langues"}
+                    {loading
+                      ? "Traduction en cours…"
+                      : "Traduire dans les 6 langues"}
                   </button>
                   <span className="text-sm text-slate-500">
-                    Allemand · Espagnol · Italien · Portugais · Croate
+                    Allemand · Croate · Espagnol · Italien · Néerlandais ·
+                    Portugais
                   </span>
                 </div>
                 {result.verdict === "refuse" && (
@@ -298,38 +319,45 @@ export default function Home() {
                   <div className="space-y-4">
                     {obsolete && (
                       <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-medium text-amber-900">
-                        Le texte a changé depuis la traduction : relancez
-                        « Traduire ».
+                        Le texte a changé depuis la traduction : relancez «
+                        Traduire ».
                       </p>
                     )}
-                    {LANGUES.map((l) => {
-                      const t = traductions[l.code];
-                      return (
-                        <div
-                          key={l.code}
-                          className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50"
-                        >
-                          <div className="flex items-center gap-3 bg-metro px-4 py-2.5">
-                            <span className="rounded bg-sun px-2 py-0.5 text-xs font-black text-metro-dark">
-                              {BADGES[l.code]}
-                            </span>
-                            <h3 className="font-bold text-white">{l.nom}</h3>
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      {LANGUES.map((l) => {
+                        const t = traductions[l.code];
+                        return (
+                          <div
+                            key={l.code}
+                            className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50"
+                          >
+                            <div className="flex items-center gap-3 bg-metro px-4 py-2.5">
+                              <span className="rounded bg-sun px-2 py-0.5 text-xs font-black text-metro-dark">
+                                {BADGES[l.code]}
+                              </span>
+                              <h3 className="font-bold text-white">{l.nom}</h3>
+                            </div>
+                            <div className="space-y-4 p-4">
+                              {!t || "error" in t ? (
+                                <p className="text-sm font-medium text-red-700">
+                                  {t && "error" in t
+                                    ? t.error
+                                    : "Pas de résultat"}
+                                </p>
+                              ) : (
+                                <>
+                                  <CopyBox label="Titre" text={t.titre} />
+                                  <CopyBox
+                                    label="Description"
+                                    text={t.description}
+                                  />
+                                </>
+                              )}
+                            </div>
                           </div>
-                          <div className="space-y-4 p-4">
-                            {!t || "error" in t ? (
-                              <p className="text-sm font-medium text-red-700">
-                                {t && "error" in t ? t.error : "Pas de résultat"}
-                              </p>
-                            ) : (
-                              <>
-                                <CopyBox label="Titre" text={t.titre} />
-                                <CopyBox label="Description" text={t.description} />
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>

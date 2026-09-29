@@ -1,9 +1,10 @@
 export const LANGUES = [
   { code: "de", nom: "Allemand", drapeau: "🇩🇪" },
+  { code: "hr", nom: "Croate", drapeau: "🇭🇷" },
   { code: "es", nom: "Espagnol", drapeau: "🇪🇸" },
   { code: "it", nom: "Italien", drapeau: "🇮🇹" },
+  { code: "nl", nom: "Néerlandais", drapeau: "🇳🇱" },
   { code: "pt-PT", nom: "Portugais (Portugal)", drapeau: "🇵🇹" },
-  { code: "hr", nom: "Croate", drapeau: "🇭🇷" },
 ] as const;
 
 export type LangCode = (typeof LANGUES)[number]["code"];
@@ -15,6 +16,10 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const GOOGLE = "https://translate.googleapis.com/translate_a/single";
 const GOOGLE_MAX = 4000;
 
+// Disjoncteur : après un 429, on n'insiste pas et on passe au moteur de secours.
+let googlePauseJusqua = 0;
+const PAUSE_GOOGLE_MS = 10 * 60 * 1000;
+
 async function googleOnce(text: string, to: string): Promise<string> {
   const res = await fetch(GOOGLE, {
     method: "POST",
@@ -22,12 +27,17 @@ async function googleOnce(text: string, to: string): Promise<string> {
     body: new URLSearchParams({ client: "gtx", sl: "fr", tl: to, dt: "t", q: text }),
     signal: AbortSignal.timeout(15000),
   });
+  if (res.status === 429) {
+    googlePauseJusqua = Date.now() + PAUSE_GOOGLE_MS;
+    throw new Error("Google HTTP 429");
+  }
   if (!res.ok) throw new Error(`Google HTTP ${res.status}`);
   const data = (await res.json()) as [Array<[string]>];
   return data[0].map((seg) => seg[0]).join("");
 }
 
 async function google(text: string, to: string): Promise<string> {
+  if (Date.now() < googlePauseJusqua) throw new Error("Google en pause (429)");
   // Les textes très longs sont coupés par paragraphe.
   const parts: string[] = [];
   let cur = "";
@@ -45,13 +55,14 @@ async function google(text: string, to: string): Promise<string> {
   for (const p of parts) {
     let lastError: unknown;
     let done = false;
-    for (let attempt = 0; attempt < 3 && !done; attempt++) {
+    for (let attempt = 0; attempt < 2 && !done; attempt++) {
       try {
         out.push(await googleOnce(p, to));
         done = true;
       } catch (e) {
         lastError = e;
-        await sleep(1200 * (attempt + 1));
+        if (Date.now() < googlePauseJusqua) break; // 429 : inutile de réessayer
+        await sleep(800);
       }
     }
     if (!done) throw lastError;

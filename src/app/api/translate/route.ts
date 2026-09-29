@@ -16,28 +16,32 @@ export async function POST(request: Request) {
     return Response.json({ error: "Texte trop long" }, { status: 413 });
   }
 
-  // Les langues sont traitées l'une après l'autre pour ne pas se faire bloquer
-  // (429) par le service gratuit.
   const traductions: Record<
     string,
     { titre: string; description: string } | { error: string }
   > = {};
 
-  for (const { code } of LANGUES) {
-    try {
-      const t = await translateText(titre, code);
-      const d = await translateText(description, code);
-      traductions[code] = { titre: t, description: d };
-    } catch (e) {
-      console.error(`[translate] ${code} :`, e);
-      traductions[code] = {
-        error:
-          "Le service de traduction gratuit est temporairement saturé. Patientez une à deux minutes puis réessayez. (" +
-          (e instanceof Error ? e.message : "erreur inconnue") +
-          ")",
-      };
+  // 3 langues en parallèle au maximum, pour rester poli avec les services gratuits.
+  const file = [...LANGUES];
+  const worker = async () => {
+    for (let l = file.shift(); l; l = file.shift()) {
+      const { code } = l;
+      try {
+        const t = await translateText(titre, code);
+        const d = await translateText(description, code);
+        traductions[code] = { titre: t, description: d };
+      } catch (e) {
+        console.error(`[translate] ${code} :`, e);
+        traductions[code] = {
+          error:
+            "Le service de traduction gratuit est temporairement saturé. Patientez une à deux minutes puis réessayez. (" +
+            (e instanceof Error ? e.message : "erreur inconnue") +
+            ")",
+        };
+      }
     }
-  }
+  };
+  await Promise.all([worker(), worker(), worker()]);
 
   return Response.json({ traductions });
 }
