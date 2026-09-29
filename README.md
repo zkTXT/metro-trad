@@ -207,4 +207,6 @@ Créé par **Ilyes Zekri** pour **Bistromania**.
 
 ## Licence
 
-Aucune licence n'est définie pour le moment : tous droits réservés par défaut. Ajoutez un fichier `LICENSE` avant toute réutilisation par des tiers.
+Distribué sous licence [MIT](LICENSE) : vous pouvez utiliser, modifier et redistribuer ce code, y compris commercialement, à condition de conserver la mention de copyright. Le logiciel est fourni « tel quel », sans garantie.
+
+Les marques citées (METRO, Google, etc.) appartiennent à leurs propriétaires respectifs ; cette licence ne couvre que le code de ce dépôt.
