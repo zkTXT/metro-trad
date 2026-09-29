@@ -1,0 +1,38 @@
+{
+  "titreMaxCaracteres": 150,
+  "descriptionMaxCaracteres": 2000,
+  "boutique": ["NomDeVotreBoutique"],
+  "motsInterdits": [
+    { "motif": "promo(tion)?s?", "raison": "Mention promotionnelle interdite" },
+    { "motif": "livraison gratuite", "raison": "Mention de livraison interdite" },
+    { "motif": "notre (boutique|magasin|société|entreprise)", "raison": "Ne pas parler de la boutique" }
+  ],
+  "phrasesInterdites": [
+    {
+      "motif": "existe (aussi )?(en|dans)",
+      "raison": "Variante du produit mentionnée",
+      "categorie": "variante"
+    },
+    {
+      "motif": "disponible (aussi )?(en|dans) (\\d+|plusieurs|différent|autres?)",
+      "raison": "Variante du produit mentionnée (tailles, couleurs...)",
+      "categorie": "variante"
+    },
+    {
+      "motif": "(autres?|différent(e)?s?) (tailles?|couleurs?|dimensions?|modèles?|versions?|finitions?|coloris)",
+      "raison": "Variante du produit mentionnée",
+      "categorie": "variante"
+    },
+    {
+      "motif": "(en option|optionnel(le)?s?|vendu(e)?s? séparément|non inclus(e)?s?|à commander séparément|en supplément)",
+      "raison": "Composant optionnel mentionné",
+      "categorie": "option"
+    },
+    {
+      "motif": "(accessoires?|pièces?) (en option|supplémentaires?|complémentaires?)",
+      "raison": "Composant optionnel mentionné",
+      "categorie": "option"
+    }
+  ],
+  "messageMetro": "Veuillez noter que, pour le moment, vous ne pouvez pas présenter des composants optionnels (accessoires, pièces supplémentaires…) et variantes (autres tailles, couleurs...) pour un produit. Par conséquent, veuillez supprimer les informations relatives aux variantes et/ou aux composants optionnels qui ne sont pas déjà inclus dans l'offre. Si vous souhaitez proposer ces éléments, veuillez les soumettre en tant que produits seuls."
+}
