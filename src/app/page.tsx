@@ -5,7 +5,13 @@ import { checkProduct, type Mode, type Verdict } from "@/lib/checker";
 import { LANGUES } from "@/lib/translate";
 
 type Traduction =
-  | { titre: string; description: string; corrections?: number }
+  | {
+      titre: string;
+      description: string;
+      corrections?: number;
+      reprises?: number;
+      nouvelles?: number;
+    }
   | { error: string };
 
 type Correction = { id: string; langue: string; mauvais: string; bon: string };
@@ -271,15 +277,25 @@ export default function Home() {
     (source.titre !== textes.titre ||
       source.description !== textes.description);
   const verdict = VERDICTS[result.verdict];
+  const stats = Object.values(traductions ?? {}).reduce(
+    (acc, t) =>
+      "error" in t
+        ? acc
+        : {
+            reprises: acc.reprises + (t.reprises ?? 0),
+            nouvelles: acc.nouvelles + (t.nouvelles ?? 0),
+          },
+    { reprises: 0, nouvelles: 0 },
+  );
 
-  async function traduire() {
+  async function traduire(sansMemoire = false) {
     setLoading(true);
     setErreur(null);
     try {
       const res = await fetch("/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(textes),
+        body: JSON.stringify({ ...textes, sansMemoire }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erreur de traduction");
@@ -311,12 +327,14 @@ export default function Home() {
               l&apos;envoi sur Metro
             </p>
           </div>
-          <div className="ml-auto hidden rounded-xl bg-white/10 px-4 py-2 text-right sm:block">
-            <div className="text-xs uppercase tracking-wide text-blue-200">
-              Espace de travail
-            </div>
-            <div className="text-sm font-bold">Ilyes Zekri · Bistromania</div>
-          </div>
+          <a
+            href="https://www.metro-selleroffice.com/fr/workplace/products/my-products/approved"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-auto rounded-xl bg-sun px-4 py-2.5 text-sm font-extrabold text-metro-dark shadow-sm transition hover:bg-sun-dark"
+          >
+            Ma boutique Metro ↗
+          </a>
         </div>
         <div className="h-1.5 bg-sun" />
       </header>
@@ -382,8 +400,7 @@ export default function Home() {
 
         {empty ? (
           <p className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-6 text-center text-sm text-slate-500">
-            Bonjour Ilyes, saisissez un titre ou une description pour lancer la
-            vérification.
+            Saisissez un titre ou une description pour lancer la vérification.
           </p>
         ) : (
           <>
@@ -447,7 +464,7 @@ export default function Home() {
               <div className="space-y-5">
                 <div className="flex flex-wrap items-center gap-3">
                   <button
-                    onClick={traduire}
+                    onClick={() => traduire()}
                     disabled={loading || result.verdict === "refuse"}
                     className="rounded-xl bg-sun px-6 py-3 text-base font-extrabold text-metro-dark shadow-sm transition hover:bg-sun-dark disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -477,6 +494,26 @@ export default function Home() {
                         Traduire ».
                       </p>
                     )}
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
+                      <span>
+                        Mémoire des traductions :{" "}
+                        <strong className="text-metro">{stats.reprises}</strong>{" "}
+                        phrase{stats.reprises > 1 ? "s" : ""} reprise
+                        {stats.reprises > 1 ? "s" : ""},{" "}
+                        <strong className="text-metro">
+                          {stats.nouvelles}
+                        </strong>{" "}
+                        nouvelle{stats.nouvelles > 1 ? "s" : ""} traduite
+                        {stats.nouvelles > 1 ? "s" : ""}
+                      </span>
+                      <button
+                        onClick={() => traduire(true)}
+                        disabled={loading}
+                        className="rounded-md border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:border-metro disabled:opacity-50"
+                      >
+                        Retraduire sans la mémoire
+                      </button>
+                    </div>
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                       {LANGUES.map((l) => {
                         const t = traductions[l.code];

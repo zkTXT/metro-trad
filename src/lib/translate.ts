@@ -9,18 +9,30 @@ export const LANGUES = [
 
 export type LangCode = (typeof LANGUES)[number]["code"];
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 // ---------- Moteur 1 : Google Traduction (point d'accès gratuit, sans clé) ----------
 
 const GOOGLE = "https://translate.googleapis.com/translate_a/single";
 const GOOGLE_MAX = 4000;
 
-// Disjoncteur : après un 429, on n'insiste pas et on passe au moteur de secours.
+// Disjoncteur : après un 429, on met Google en pause 2 minutes (moteur de secours
+// entre-temps), puis UNE seule requête d'essai décide si on le reprend.
 let googlePauseJusqua = 0;
-const PAUSE_GOOGLE_MS = 10 * 60 * 1000;
+let sondeEnCours = false;
+const PAUSE_GOOGLE_MS = 2 * 60 * 1000;
+
+// Espace les requêtes envoyées à Google (~300 ms) pour rester sous son seuil.
+const ESPACEMENT_MS = 300;
+let fileEnvois: Promise<void> = Promise.resolve();
+function espacer(): Promise<void> {
+  const p = fileEnvois.then(() => sleep(ESPACEMENT_MS));
+  fileEnvois = p;
+  return p;
+}
 
 async function googleOnce(text: string, to: string): Promise<string> {
+  await espacer();
   const res = await fetch(GOOGLE, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -44,6 +56,22 @@ async function googleOnce(text: string, to: string): Promise<string> {
 
 async function google(text: string, to: string): Promise<string> {
   if (Date.now() < googlePauseJusqua) throw new Error("Google en pause (429)");
+  if (googlePauseJusqua > 0) {
+    // Pause écoulée : une seule requête d'essai, les autres restent sur MyMemory.
+    if (sondeEnCours) throw new Error("Google en pause (essai en cours)");
+    sondeEnCours = true;
+    try {
+      const r = await googleTexte(text, to);
+      googlePauseJusqua = 0;
+      return r;
+    } finally {
+      sondeEnCours = false;
+    }
+  }
+  return googleTexte(text, to);
+}
+
+async function googleTexte(text: string, to: string): Promise<string> {
   // Les textes très longs sont coupés par paragraphe.
   const parts: string[] = [];
   let cur = "";
@@ -175,7 +203,7 @@ async function myMemory(text: string, to: string): Promise<string> {
 
 // ---------- API publique ----------
 
-export async function translateText(
+export async function traduireBrut(
   text: string,
   to: LangCode,
 ): Promise<string> {
