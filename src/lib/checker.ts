@@ -31,7 +31,7 @@ const compile = (motif: string) => new RegExp(motif, "i");
 const tidy = (s: string) =>
   s
     .replace(/[ \t]{2,}/g, " ")
-    .replace(/\s+([,.;:!?])/g, "$1")
+    .replace(/\s+([,.])/g, "$1")
     .replace(/([,;:])\s*([.!?])/g, "$2")
     .replace(/([.!?])(\s*[.!?])+/g, "$1")
     .replace(/^[\s,;:.-]+/, "")
