@@ -295,18 +295,27 @@ export default function Home() {
   return (
     <>
       <header className="bg-metro text-white">
-        <div className="mx-auto flex max-w-7xl items-center gap-4 px-5 py-5">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-5 py-5">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-sun text-xl font-black text-metro-dark">
             M
           </div>
           <div>
             <h1 className="text-xl font-extrabold leading-tight sm:text-2xl">
               Metro Trad
+              <span className="ml-2 align-middle text-sm font-semibold text-sun">
+                by Bistromania
+              </span>
             </h1>
             <p className="text-sm text-blue-100">
               Vérifiez, nettoyez et traduisez vos fiches produit avant
-              l&apos;envoi
+              l&apos;envoi sur Metro
             </p>
+          </div>
+          <div className="ml-auto hidden rounded-xl bg-white/10 px-4 py-2 text-right sm:block">
+            <div className="text-xs uppercase tracking-wide text-blue-200">
+              Espace de travail
+            </div>
+            <div className="text-sm font-bold">Ilyes Zekri · Bistromania</div>
           </div>
         </div>
         <div className="h-1.5 bg-sun" />
@@ -373,7 +382,8 @@ export default function Home() {
 
         {empty ? (
           <p className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-6 text-center text-sm text-slate-500">
-            Saisissez un titre ou une description pour lancer la vérification.
+            Bonjour Ilyes, saisissez un titre ou une description pour lancer la
+            vérification.
           </p>
         ) : (
           <>
@@ -517,6 +527,16 @@ export default function Home() {
 
         <Glossaire />
       </main>
+
+      <footer className="mt-4 border-t-4 border-sun bg-metro text-blue-100">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-5 py-4 text-xs">
+          <span>
+            <strong className="text-white">Bistromania</strong> · Mobilier et
+            équipement CHR
+          </span>
+          <span>Outil interne conçu par Ilyes Zekri</span>
+        </div>
+      </footer>
     </>
   );
 }

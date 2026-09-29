@@ -13,8 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Metro Trad : vérificateur et traducteur de fiches produit",
-  description: "Nettoie et traduit les fiches produit avant l'envoi sur Metro.",
+  title: "Metro Trad · Bistromania",
+  description:
+    "Bistromania : vérifie, nettoie et traduit les fiches produit avant l'envoi sur Metro.",
+  authors: [{ name: "Ilyes Zekri" }],
+  applicationName: "Metro Trad",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
