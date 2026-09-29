@@ -15,10 +15,32 @@ export interface LigneSource {
   description: string;
 }
 
+// ExcelJS lit <strike val="0"/> comme « barré » (il ne regarde pas la valeur) : un
+// fichier Metro se retrouvait entièrement barré, gras et italique. On normalise
+// donc les polices avant la lecture : « val="0" » disparaît, « val="1" » devient
+// une balise simple.
+export function corrigerPolices(styles: string): string {
+  const balises = "b|i|strike|outline|shadow|condense|extend";
+  return styles
+    .replace(new RegExp(`<(?:${balises})\\s+val="(?:0|false)"\\s*/>`, "g"), "")
+    .replace(
+      new RegExp(`<(${balises})\\s+val="(?:1|true)"\\s*/>`, "g"),
+      "<$1/>",
+    );
+}
+
 export async function lireClasseur(file: File): Promise<Workbook> {
   const ExcelJS = (await import("exceljs")).default;
+  const JSZip = (await import("jszip")).default;
+  const zip = await JSZip.loadAsync(await file.arrayBuffer());
+  const fichierStyles = zip.file("xl/styles.xml");
+  if (fichierStyles) {
+    const xml = await fichierStyles.async("string");
+    const corrige = corrigerPolices(xml);
+    if (corrige !== xml) zip.file("xl/styles.xml", corrige);
+  }
   const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(await file.arrayBuffer());
+  await wb.xlsx.load(await zip.generateAsync({ type: "arraybuffer" }));
   return wb;
 }
 
