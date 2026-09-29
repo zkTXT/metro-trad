@@ -42,3 +42,6 @@ next-env.d.ts
 
 # mémoire des traductions (locale)
 /data/memoire.json
+
+# exemple de configuration (versionné)
+!.env.example
