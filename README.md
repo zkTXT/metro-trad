@@ -1,69 +1,73 @@
 # Metro Trad
 
-Outil web pour **préparer les fiches produit avant leur envoi sur la marketplace METRO** : il vérifie les textes selon les règles de contenu de la plateforme, supprime ce qui poserait problème, puis traduit le titre et la description dans les 6 langues attendues.
+🇬🇧 English · 🇫🇷 [Version française](README.fr.md)
 
-Il a été conçu pour la société **Bistromania** (mobilier et équipement CHR), qui ajoute régulièrement des dizaines de produits et devait jusqu'ici tout vérifier et traduire à la main.
+A web tool to **prepare product listings before uploading them to the METRO marketplace**: it checks the texts against the platform's content rules, removes whatever would get the listing rejected, then translates the title and description into the six required languages.
 
-> **Outil indépendant, non affilié à METRO.** « METRO » est une marque de ses propriétaires. Les règles intégrées sont celles observées dans les refus de fiches ; elles ne remplacent pas la validation de la plateforme.
+It was built for **Bistromania** (furniture and equipment for the hospitality industry), a seller that adds dozens of products on a regular basis and used to check and translate everything by hand.
+
+> **Independent tool, not affiliated with METRO.** "METRO" is a trademark of its respective owners. The built-in rules come from rejections observed in practice; they do not replace the platform's own validation.
+>
+> The application interface is in **French**.
 
 ---
 
-## Sommaire
+## Table of contents
 
-- [Ce que fait l'outil](#ce-que-fait-loutil)
-- [Fonctionnalités](#fonctionnalités)
+- [What it does](#what-it-does)
+- [Features](#features)
 - [Installation](#installation)
 - [Configuration](#configuration)
-- [Utilisation](#utilisation)
-- [Les règles Metro](#les-règles-metro)
-- [Traduction : moteurs, quotas, mémoire, glossaire](#traduction--moteurs-quotas-mémoire-glossaire)
-- [Import Excel (modèle Metro)](#import-excel-modèle-metro)
-- [Structure du projet](#structure-du-projet)
-- [Confidentialité](#confidentialité)
-- [Limites connues](#limites-connues)
-- [Dépannage](#dépannage)
+- [Usage](#usage)
+- [The Metro rules](#the-metro-rules)
+- [Translation: engines, quotas, memory, glossary](#translation-engines-quotas-memory-glossary)
+- [Excel import (Metro template)](#excel-import-metro-template)
+- [Project structure](#project-structure)
+- [Privacy](#privacy)
+- [Known limitations](#known-limitations)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
-## Ce que fait l'outil
+## What it does
 
-METRO est strict sur le contenu des fiches. Erreur type renvoyée par la plateforme :
+METRO is strict about listing content. A typical rejection message from the platform reads (translated from French):
 
-> *« Vous ne pouvez pas présenter des composants optionnels (accessoires, pièces supplémentaires…) et variantes (autres tailles, couleurs…) pour un produit. Veuillez supprimer les informations relatives aux variantes et/ou aux composants optionnels qui ne sont pas déjà inclus dans l'offre. »*
+> *"Please note that you cannot currently present optional components (accessories, extra parts…) or variants (other sizes, colours…) for a product. Please remove any information about variants and/or optional components that are not already included in the offer. If you want to offer them, submit them as separate products."*
 
-Il faut en plus traduire chaque texte dans plusieurs langues et ne jamais parler de sa boutique. Metro Trad automatise ce travail :
+On top of that, every text has to be translated into several languages and must never mention your own shop. Metro Trad automates this work:
 
-1. **Nettoyage** : détecte et supprime les variantes, options, mentions promotionnelles, noms de boutique, etc.
-2. **Verdict** : *Validé*, *Corrigé automatiquement (à relire)* ou *Risque de refus*.
-3. **Traduction** : allemand, croate, espagnol, italien, néerlandais et portugais (Portugal), à partir du français.
-4. **Import Excel** : traite un fichier complet (35 produits ou plus) au format d'import METRO, en remplissant directement les bonnes colonnes.
+1. **Cleaning**: detects and removes variants, options, promotional wording, shop names, etc.
+2. **Verdict**: *Valid*, *Automatically corrected (please review)* or *Risk of rejection*.
+3. **Translation**: German, Croatian, Spanish, Italian, Dutch and Portuguese (Portugal), from French.
+4. **Excel import**: processes a whole file (35 products or more) in the METRO import format, filling the right columns directly.
 
-Le tout est **gratuit** : aucune clé d'API payante, aucun compte requis.
+Everything is **free**: no paid API key, no account required.
 
-## Fonctionnalités
+## Features
 
-### Page « Fiche produit »
-- Saisie d'un titre et d'une description en français, avec compteurs de caractères.
-- Deux modes : **Supprimer automatiquement** (le texte est corrigé) ou **Signaler seulement** (le texte est conservé, les problèmes sont listés).
-- Liste détaillée des problèmes détectés, avec l'extrait concerné.
-- Affichage du message type de METRO quand une variante ou une option est détectée.
-- Traduction dans les 6 langues, affichée en grille : une carte par langue, avec une boîte *Titre*, une boîte *Description* et un bouton **Copier** pour chacune.
-- Bouton « Retraduire sans la mémoire ».
+### "Product sheet" page (*Fiche produit*)
+- Enter a title and description in French, with character counters.
+- Two modes: **Remove automatically** (the text is corrected) or **Flag only** (the text is kept and the problems are listed).
+- Detailed list of the problems found, with the offending excerpt.
+- Shows METRO's standard message when a variant or an option is detected.
+- Translation into the 6 languages, displayed as a grid: one card per language, each with a *Title* box, a *Description* box and a **Copy** button.
+- "Retranslate without memory" button.
 
-### Page « Import Excel »
-- Lecture d'un fichier `.xlsx` **dans le navigateur** (le fichier n'est jamais envoyé sur internet).
-- **Détection automatique du modèle d'import METRO** (colonnes `Product name XX` / `Description XX`), ou choix manuel des colonnes pour un fichier libre.
-- Barre de progression, temps restant estimé, boutons *Arrêter* et *Reprendre*.
-- Écriture des résultats **dans les colonnes existantes** du modèle, sans en ajouter, en conservant la mise en forme, les listes déroulantes et les feuilles cachées.
-- Ajout automatique des **consignes de sécurité standard** dans les 7 langues.
-- Téléchargement du fichier rempli et d'un **rapport** séparé (statut et corrections par produit).
+### "Excel import" page (*Import Excel*)
+- Reads an `.xlsx` file **in the browser** (the file is never uploaded anywhere).
+- **Automatic detection of the METRO import template** (`Product name XX` / `Description XX` columns), or manual column selection for free-form files.
+- Progress bar, estimated remaining time, *Stop* and *Resume* buttons.
+- Writes the results **into the template's existing columns** without adding any, while keeping formatting, dropdown lists and hidden sheets.
+- Automatically adds the **standard safety instructions** in the 7 languages.
+- Download of the filled file and of a separate **report** (status and corrections per product).
 
-### Glossaire CHR
-Corrections de vocabulaire par langue, appliquées après chaque traduction (par exemple « restauro » → « restauração » en portugais). Modifiable depuis la page.
+### Hospitality glossary
+Per-language vocabulary corrections applied after each translation (for example "restauro" → "restauração" in Portuguese). Editable from the page.
 
 ## Installation
 
-Prérequis : **Node.js 20.9 ou plus récent** (testé avec Node 22) et npm.
+Requirements: **Node.js 20.9 or newer** (tested with Node 22) and npm.
 
 ```bash
 git clone https://github.com/zkTXT/metro-trad.git
@@ -73,140 +77,141 @@ npm install
 
 ## Configuration
 
-Copiez le fichier d'exemple, puis renseignez-le :
+Copy the example file, then fill it in:
 
 ```bash
 cp .env.example .env.local
 ```
 
-| Variable | Rôle |
+| Variable | Purpose |
 |---|---|
-| `MYMEMORY_EMAILS` | Adresses email (séparées par des virgules) utilisées pour identifier vos requêtes auprès de MyMemory, le moteur de secours. Chaque adresse donne un quota quotidien ; la suivante prend le relais quand l'une est épuisée. Facultatif : sans email, le quota anonyme (beaucoup plus faible) s'applique. |
+| `MYMEMORY_EMAILS` | Email addresses (comma-separated) used to identify your requests to MyMemory, the fallback engine. Each address has its own daily quota; the next one takes over when one is used up. Optional: without any email, the (much smaller) anonymous quota applies. |
 
-`.env.local` est ignoré par git : il ne sera jamais publié. **Redémarrez le serveur après toute modification.**
+`.env.local` is ignored by git and will never be published. **Restart the server after any change.**
 
-## Utilisation
+## Usage
 
 ```bash
 npm run dev
 ```
 
-Puis ouvrez <http://localhost:3000>.
+Then open <http://localhost:3000>.
 
-| Commande | Effet |
+| Command | Effect |
 |---|---|
-| `npm run dev` | Serveur de développement |
-| `npm run build` | Compilation de production |
-| `npm start` | Lance la version compilée |
-| `npm run lint` | Vérification du code |
+| `npm run dev` | Development server |
+| `npm run build` | Production build |
+| `npm start` | Runs the production build |
+| `npm run lint` | Code linting |
 
-## Les règles Metro
+## The Metro rules
 
-Toutes les règles sont dans **`src/lib/regles.json`**, modifiable sans toucher au code :
+All the rules live in **`src/lib/regles.json`** and can be edited without touching the code:
 
-| Clé | Rôle |
+| Key | Purpose |
 |---|---|
-| `titreMaxCaracteres`, `descriptionMaxCaracteres` | Longueurs maximales. **Valeurs d'exemple : remplacez-les par celles de METRO.** |
-| `boutique` | Noms de votre boutique à ne jamais citer (le nom et ses variantes, adresse web incluse). **À remplacer par le vôtre.** |
-| `motsInterdits` | Mots ou expressions (expressions régulières) retirés du texte, avec la raison affichée. |
-| `phrasesInterdites` | Motifs qui font supprimer la **phrase entière** (variantes, options : « existe aussi en… », « en option », « vendu séparément »…). |
-| `messageMetro` | Message type affiché quand une variante ou une option est détectée. |
+| `titreMaxCaracteres`, `descriptionMaxCaracteres` | Maximum lengths. **Example values: replace them with METRO's actual limits.** |
+| `boutique` | Names of your shop that must never appear (the name and its variants, including the web address). **Replace with your own.** |
+| `motsInterdits` | Words or expressions (regular expressions) removed from the text, with the reason shown to the user. |
+| `phrasesInterdites` | Patterns that cause the **whole sentence** to be removed (variants, options: "also available in…", "optional", "sold separately"…). |
+| `messageMetro` | Standard message displayed when a variant or option is detected. |
 
-Comportements à connaître :
-- Un texte **sans aucun problème est renvoyé identique, au caractère près**.
-- Quand retirer un mot laisserait un fragment orphelin (par exemple « sur. »), la phrase entière est supprimée dans une description ; dans un titre, seuls les mots pendants en fin de titre sont retirés.
-- Les longueurs ne sont jamais corrigées automatiquement : un titre trop long est signalé.
-- Le moteur ne trouve que ce qui figure dans les règles. **Ajoutez vos propres refus METRO** au fil du temps.
+Behaviours worth knowing:
+- A text **with no problem is returned identical, character for character**.
+- When removing a word would leave an orphan fragment (for example "on."), the whole sentence is removed from a description; in a title, only the dangling words at the end are trimmed.
+- Lengths are never corrected automatically: a title that is too long is flagged.
+- The engine only finds what is in the rules. **Add your own METRO rejections** over time.
+- The patterns are written for **French** texts, since French is the source language.
 
-## Traduction : moteurs, quotas, mémoire, glossaire
+## Translation: engines, quotas, memory, glossary
 
-### Moteurs
-1. **Google Traduction** (point d'accès gratuit non officiel, sans clé) : moteur principal, meilleure qualité.
-2. **MyMemory** (gratuit) : moteur de secours, utilisé quand Google refuse. Qualité un peu moindre.
+### Engines
+1. **Google Translate** (free, unofficial endpoint, no key): main engine, best quality.
+2. **MyMemory** (free): fallback engine, used when Google refuses. Slightly lower quality.
 
-Google limite le nombre de requêtes par adresse IP (erreur 429). L'outil s'en protège :
-- délai entre les requêtes (300 ms en usage normal, **4 secondes pendant un import Excel**) ;
-- **disjoncteur** : après un refus, Google est mis en pause 2 minutes, puis une seule requête d'essai décide de le reprendre ; la pause double à chaque refus consécutif (jusqu'à 30 minutes) ;
-- une seule requête par langue et par produit (titre et description envoyés ensemble).
+Google limits the number of requests per IP address (HTTP 429 error). The tool protects itself:
+- a delay between requests (300 ms in normal use, **4 seconds during an Excel import**);
+- a **circuit breaker**: after a refusal, Google is paused for 2 minutes, then a single probe request decides whether to resume it; the pause doubles on every consecutive refusal (up to 30 minutes);
+- a single request per language and per product (title and description are sent together).
 
-### Quotas MyMemory
-Environ 5 000 caractères par jour sans email, et environ 50 000 par jour avec un email (d'après la documentation du service ; à vérifier). Une fiche moyenne (~1 100 caractères) coûte environ 6 600 caractères de quota pour les 6 langues.
+### MyMemory quotas
+Roughly 5,000 characters per day without an email and roughly 50,000 per day with one (according to the service's documentation; please verify). An average listing (~1,100 characters) costs about 6,600 characters of quota for the 6 languages.
 
-### Mémoire des traductions
-Chaque phrase traduite est mémorisée par langue dans `data/memoire.json` (ignoré par git). Retraduire un texte déjà vu ne consomme aucun quota, et si une seule phrase change, seule celle-là est retraduite.
+### Translation memory
+Every translated sentence is remembered per language in `data/memoire.json` (ignored by git). Translating a text that was already seen uses no quota, and if only one sentence changes, only that one is translated again.
 
-### Glossaire
-Les corrections sont dans `data/glossaire.json`, éditables depuis la page. Elles s'appliquent **après** la mémoire, donc une nouvelle correction agit immédiatement. Le remplacement ne touche que le mot exact, en respectant la casse ; ajoutez aussi les pluriels.
+### Glossary
+Corrections are stored in `data/glossaire.json` and are editable from the page. They are applied **after** the memory, so a new correction takes effect immediately. A replacement only affects the exact word and preserves capitalisation; remember to add plural forms too.
 
-## Import Excel (modèle Metro)
+## Excel import (Metro template)
 
-Pour un fichier au format d'import METRO :
+For a file in the METRO import format:
 
-- **Source** : `Product name FR` et `Description FR`. Ils sont nettoyés puis réécrits dans les mêmes cases.
-- **Cibles** : `Product name` / `Description` pour DE, HR, ES, IT, NL et PT.
-- **Aucune colonne n'est ajoutée** au fichier.
-- **Cases déjà remplies** : conservées, sauf si le français a dû être corrigé (les langues sont alors retraduites) ou si l'option « Remplacer aussi les traductions déjà présentes » est cochée.
-- **Consignes de sécurité** : les cases vides de `Product safety instructions XX` reçoivent le texte standard (`src/lib/consignes.ts`). Une case déjà remplie n'est jamais modifiée.
-- **Rapport** : un second fichier Excel liste le statut, les corrections et l'état de chaque langue pour chaque produit.
+- **Source**: `Product name FR` and `Description FR`. They are cleaned, then written back into the same cells.
+- **Targets**: `Product name` / `Description` for DE, HR, ES, IT, NL and PT.
+- **No column is added** to the file.
+- **Cells that are already filled**: kept, unless the French had to be corrected (the languages are then translated again) or the "Replace existing translations too" option is ticked.
+- **Safety instructions**: empty `Product safety instructions XX` cells receive the standard text (`src/lib/consignes.ts`). A cell that is already filled is never modified.
+- **Report**: a second Excel file lists the status, the corrections and the state of each language for every product.
 
-Pour un fichier libre, l'outil devine les colonnes titre et description d'après leurs en-têtes ; vous pouvez les corriger, ainsi que la ligne d'en-têtes. Les résultats sont alors **ajoutés en colonnes** à droite du fichier.
+For a free-form file, the tool guesses the title and description columns from their headers; you can correct them, as well as the header row. The results are then **added as new columns** on the right of the file.
 
-Seuls le titre et la description sont traduits ; les autres champs multilingues du modèle (caractéristiques clés, composition des matériaux, garantie…) ne le sont pas.
+Only the title and the description are translated; the template's other multilingual fields (key features, material composition, warranty…) are not.
 
-## Structure du projet
+## Project structure
 
 ```
 data/
-  glossaire.json          Corrections de vocabulaire par langue
+  glossaire.json          Vocabulary corrections per language
 src/
   app/
-    page.tsx              Page « Fiche produit »
-    import/page.tsx       Page « Import Excel »
-    api/translate/        Route de traduction
-    api/glossaire/        Route de gestion du glossaire
-  components/Chrome.tsx   En-tête et pied de page communs
+    page.tsx              "Product sheet" page
+    import/page.tsx       "Excel import" page
+    api/translate/        Translation route
+    api/glossaire/        Glossary management route
+  components/Chrome.tsx   Shared header and footer
   lib/
-    regles.json           Règles Metro (à personnaliser)
-    checker.ts            Moteur de nettoyage et de verdict
-    translate.ts          Moteurs de traduction (Google, MyMemory)
-    memoire.ts            Mémoire des traductions
-    glossaire.ts          Application du glossaire
-    excel.ts              Lecture / écriture Excel, modèle Metro
-    consignes.ts          Consignes de sécurité standard
+    regles.json           Metro rules (to customise)
+    checker.ts            Cleaning and verdict engine
+    translate.ts          Translation engines (Google, MyMemory)
+    memoire.ts            Translation memory
+    glossaire.ts          Glossary application
+    excel.ts              Excel reading / writing, Metro template
+    consignes.ts          Standard safety instructions
 ```
 
-Technologies : Next.js (App Router), React, TypeScript, Tailwind CSS, ExcelJS, JSZip.
+Technologies: Next.js (App Router), React, TypeScript, Tailwind CSS, ExcelJS, JSZip.
 
-## Confidentialité
+## Privacy
 
-- Les fichiers Excel sont lus **dans le navigateur** et ne sont jamais envoyés à un serveur tiers.
-- Les **textes** (titres et descriptions) sont envoyés aux services de traduction (Google, MyMemory) : n'y mettez rien de confidentiel.
-- `.env.local` (vos emails) et `data/memoire.json` ne sont pas versionnés.
+- Excel files are read **in the browser** and are never sent to a third-party server.
+- The **texts** (titles and descriptions) are sent to the translation services (Google, MyMemory): do not put anything confidential in them.
+- `.env.local` (your emails) and `data/memoire.json` are not version-controlled.
 
-## Limites connues
+## Known limitations
 
-- Le point d'accès Google utilisé est **non officiel** : il peut cesser de fonctionner ou limiter fortement l'usage sans préavis. Pour un usage intensif ou professionnel, préférez une API officielle (Azure Translator, Google Cloud Translation), qui demande généralement un compte avec moyen de paiement.
-- Les traductions automatiques gratuites demandent une **relecture**, surtout avec le moteur de secours.
-- Le glossaire et la mémoire sont stockés dans des **fichiers locaux** : l'application est prévue pour tourner sur un poste ou un serveur classique, pas sur un hébergement serverless à système de fichiers en lecture seule (Vercel par exemple) sans adaptation.
-- Format `.xlsx` uniquement (pas `.xls` ni `.csv`).
-- Aucune garantie de validation par METRO : l'outil réduit le risque de refus, il ne le supprime pas.
+- The Google endpoint used is **unofficial**: it may stop working or become heavily rate-limited without notice. For intensive or professional use, prefer an official API (Azure Translator, Google Cloud Translation), which generally requires an account with a payment method.
+- Free machine translation calls for **proofreading**, especially with the fallback engine.
+- The glossary and the memory are stored in **local files**: the application is meant to run on a workstation or a regular server, not on a serverless host with a read-only file system (Vercel, for example) without adaptation.
+- `.xlsx` only (no `.xls` or `.csv`).
+- No guarantee of approval by METRO: the tool reduces the risk of rejection, it does not remove it.
 
-## Dépannage
+## Troubleshooting
 
-| Problème | Solution |
+| Problem | Solution |
 |---|---|
-| « Le service de traduction gratuit est temporairement saturé » | Google et MyMemory refusent. Attendez 1 à 2 minutes et relancez ; les phrases déjà traduites sont en mémoire. |
-| Quota MyMemory atteint | Ajoutez des emails dans `MYMEMORY_EMAILS`, ou reprenez le lendemain. |
-| Mes emails ne sont pas pris en compte | Redémarrez `npm run dev` après avoir modifié `.env.local`. |
-| L'import ne détecte pas mes colonnes | Vérifiez la ligne d'en-têtes et choisissez les colonnes dans les listes. |
-| Fichier refusé | Enregistrez-le au format `.xlsx`. |
+| "The free translation service is temporarily overloaded" (French message) | Google and MyMemory are both refusing. Wait 1 to 2 minutes and try again; the sentences already translated are in memory. |
+| MyMemory quota reached | Add more emails to `MYMEMORY_EMAILS`, or resume the next day. |
+| My emails are not taken into account | Restart `npm run dev` after editing `.env.local`. |
+| The import does not detect my columns | Check the header row and pick the columns from the dropdowns. |
+| File rejected | Save it as `.xlsx`. |
 
-## Auteur
+## Author
 
-Créé par **Ilyes Zekri** pour **Bistromania**.
+Created by **Ilyes Zekri** for **Bistromania**.
 
-## Licence
+## License
 
-Distribué sous licence [MIT](LICENSE) : vous pouvez utiliser, modifier et redistribuer ce code, y compris commercialement, à condition de conserver la mention de copyright. Le logiciel est fourni « tel quel », sans garantie.
+Released under the [MIT license](LICENSE): you may use, modify and redistribute this code, including commercially, provided the copyright notice is kept. The software is provided "as is", without warranty.
 
-Les marques citées (METRO, Google, etc.) appartiennent à leurs propriétaires respectifs ; cette licence ne couvre que le code de ce dépôt.
+The trademarks mentioned (METRO, Google, etc.) belong to their respective owners; this license only covers the code in this repository.
