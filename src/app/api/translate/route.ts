@@ -1,3 +1,4 @@
+import { appliquerGlossaire, lireGlossaire } from "@/lib/glossaire";
 import { LANGUES, translateText } from "@/lib/translate";
 
 export async function POST(request: Request) {
@@ -7,7 +8,8 @@ export async function POST(request: Request) {
   } | null;
 
   const titre = typeof body?.titre === "string" ? body.titre : "";
-  const description = typeof body?.description === "string" ? body.description : "";
+  const description =
+    typeof body?.description === "string" ? body.description : "";
 
   if (!titre.trim() && !description.trim()) {
     return Response.json({ error: "Aucun texte à traduire" }, { status: 400 });
@@ -18,8 +20,10 @@ export async function POST(request: Request) {
 
   const traductions: Record<
     string,
-    { titre: string; description: string } | { error: string }
+    | { titre: string; description: string; corrections: number }
+    | { error: string }
   > = {};
+  const glossaire = await lireGlossaire();
 
   // 3 langues en parallèle au maximum, pour rester poli avec les services gratuits.
   const file = [...LANGUES];
@@ -29,7 +33,13 @@ export async function POST(request: Request) {
       try {
         const t = await translateText(titre, code);
         const d = await translateText(description, code);
-        traductions[code] = { titre: t, description: d };
+        const gt = appliquerGlossaire(t, code, glossaire);
+        const gd = appliquerGlossaire(d, code, glossaire);
+        traductions[code] = {
+          titre: gt.texte,
+          description: gd.texte,
+          corrections: gt.nb + gd.nb,
+        };
       } catch (e) {
         console.error(`[translate] ${code} :`, e);
         traductions[code] = {

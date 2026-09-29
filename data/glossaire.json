@@ -1,0 +1,26 @@
+[
+  {
+    "id": "seed-1",
+    "langue": "pt-PT",
+    "mauvais": "restauro",
+    "bon": "restauração"
+  },
+  {
+    "id": "seed-2",
+    "langue": "pt-PT",
+    "mauvais": "catering",
+    "bon": "restauração"
+  },
+  {
+    "id": "seed-3",
+    "langue": "pt-PT",
+    "mauvais": "grades",
+    "bon": "grelhas"
+  },
+  {
+    "id": "seed-4",
+    "langue": "es",
+    "mauvais": "catering",
+    "bon": "restauración"
+  }
+]

@@ -1,10 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { checkProduct, type Mode, type Verdict } from "@/lib/checker";
 import { LANGUES } from "@/lib/translate";
 
-type Traduction = { titre: string; description: string } | { error: string };
+type Traduction =
+  | { titre: string; description: string; corrections?: number }
+  | { error: string };
+
+type Correction = { id: string; langue: string; mauvais: string; bon: string };
 
 const BADGES: Record<string, string> = {
   de: "DE",
@@ -93,6 +97,146 @@ const VERDICTS: Record<
     classes: "border-red-300 bg-red-50 text-red-900",
   },
 };
+
+const selectClasses =
+  "rounded-lg border border-slate-300 bg-white p-2.5 text-sm text-slate-900 outline-none focus:border-metro focus:ring-4 focus:ring-metro/15";
+
+function Glossaire() {
+  const [entries, setEntries] = useState<Correction[]>([]);
+  const [langue, setLangue] = useState<string>(LANGUES[0].code);
+  const [mauvais, setMauvais] = useState("");
+  const [bon, setBon] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/glossaire")
+      .then((r) => r.json())
+      .then((d) => setEntries(d.corrections ?? []))
+      .catch(() => {});
+  }, []);
+
+  async function ajouter() {
+    setErr(null);
+    const res = await fetch("/api/glossaire", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ langue, mauvais, bon }),
+    });
+    const d = await res.json();
+    if (!res.ok) return setErr(d.error ?? "Erreur");
+    setEntries(d.corrections);
+    setMauvais("");
+    setBon("");
+  }
+
+  async function supprimer(id: string) {
+    const res = await fetch(`/api/glossaire?id=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+    const d = await res.json();
+    if (res.ok) setEntries(d.corrections);
+    else setErr(d.error ?? "Erreur");
+  }
+
+  return (
+    <details className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <summary className="flex cursor-pointer list-none items-center gap-3 text-lg font-bold text-metro">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sun text-sm font-black text-metro-dark">
+          G
+        </span>
+        Glossaire CHR
+        <span className="text-sm font-medium text-slate-500">
+          ({entries.length} correction{entries.length > 1 ? "s" : ""})
+        </span>
+        <span className="ml-auto text-sm text-slate-400 group-open:rotate-180">
+          ▾
+        </span>
+      </summary>
+
+      <div className="mt-4 space-y-4">
+        <p className="text-sm text-slate-600">
+          Quand une traduction utilise un mot qui ne convient pas, ajoutez-le
+          ici : il sera remplacé automatiquement à chaque traduction, dans la
+          langue choisie. Le remplacement ne touche que le mot exact (pensez à
+          ajouter aussi le pluriel).
+        </p>
+
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-xs font-semibold text-slate-700">
+            Langue
+            <select
+              className={`${selectClasses} mt-1 block`}
+              value={langue}
+              onChange={(e) => setLangue(e.target.value)}
+            >
+              {LANGUES.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.nom}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grow text-xs font-semibold text-slate-700">
+            Mot à remplacer
+            <input
+              className={`${selectClasses} mt-1 block w-full`}
+              placeholder="ex. : restauro"
+              value={mauvais}
+              onChange={(e) => setMauvais(e.target.value)}
+            />
+          </label>
+          <label className="grow text-xs font-semibold text-slate-700">
+            Remplacer par
+            <input
+              className={`${selectClasses} mt-1 block w-full`}
+              placeholder="ex. : restauração"
+              value={bon}
+              onChange={(e) => setBon(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && ajouter()}
+            />
+          </label>
+          <button
+            onClick={ajouter}
+            className="rounded-lg bg-sun px-5 py-2.5 text-sm font-extrabold text-metro-dark hover:bg-sun-dark"
+          >
+            Ajouter
+          </button>
+        </div>
+        {err && <p className="text-sm font-medium text-red-700">{err}</p>}
+
+        {entries.length > 0 && (
+          <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200">
+            {LANGUES.flatMap((l) =>
+              entries
+                .filter((e) => e.langue === l.code)
+                .map((e) => (
+                  <li
+                    key={e.id}
+                    className="flex items-center gap-3 px-3 py-2 text-sm text-slate-800"
+                  >
+                    <span className="rounded bg-metro px-2 py-0.5 text-[11px] font-bold text-white">
+                      {BADGES[l.code]}
+                    </span>
+                    <span className="line-through decoration-red-400">
+                      {e.mauvais}
+                    </span>
+                    <span className="text-slate-400">→</span>
+                    <span className="font-semibold">{e.bon}</span>
+                    <button
+                      onClick={() => supprimer(e.id)}
+                      className="ml-auto rounded px-2 py-0.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+                    >
+                      Supprimer
+                    </button>
+                  </li>
+                )),
+            )}
+          </ul>
+        )}
+      </div>
+    </details>
+  );
+}
 
 const inputClasses =
   "w-full rounded-lg border border-slate-300 bg-white p-3 text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-metro focus:ring-4 focus:ring-metro/15";
@@ -336,6 +480,12 @@ export default function Home() {
                                 {BADGES[l.code]}
                               </span>
                               <h3 className="font-bold text-white">{l.nom}</h3>
+                              {t && !("error" in t) && !!t.corrections && (
+                                <span className="ml-auto rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold text-white">
+                                  {t.corrections} correction
+                                  {t.corrections > 1 ? "s" : ""} glossaire
+                                </span>
+                              )}
                             </div>
                             <div className="space-y-4 p-4">
                               {!t || "error" in t ? (
@@ -364,6 +514,8 @@ export default function Home() {
             </Card>
           </>
         )}
+
+        <Glossaire />
       </main>
     </>
   );
