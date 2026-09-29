@@ -24,7 +24,13 @@ async function googleOnce(text: string, to: string): Promise<string> {
   const res = await fetch(GOOGLE, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ client: "gtx", sl: "fr", tl: to, dt: "t", q: text }),
+    body: new URLSearchParams({
+      client: "gtx",
+      sl: "fr",
+      tl: to,
+      dt: "t",
+      q: text,
+    }),
     signal: AbortSignal.timeout(15000),
   });
   if (res.status === 429) {
@@ -70,7 +76,7 @@ async function google(text: string, to: string): Promise<string> {
   return out.join("\n");
 }
 
-// ---------- Moteur 2 : MyMemory (secours, gratuit, sans clé) ----------
+// ---------- Moteur 2 : MyMemory (secours, gratuit) ----------
 
 const MYMEMORY = "https://api.mymemory.translated.net/get";
 const MYMEMORY_MAX = 450;
@@ -91,19 +97,60 @@ function sentenceChunks(line: string): string[] {
   return out;
 }
 
+// Emails d'identification (MYMEMORY_EMAILS dans .env.local). Chaque email a son quota
+// quotidien ; on passe au suivant dès que l'un est épuisé.
+const emails = () =>
+  (process.env.MYMEMORY_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean);
+
+const jour = () => new Date().toISOString().slice(0, 10);
+const epuises = new Map<string, string>(); // email -> jour où le quota a été atteint
+let curseur = 0;
+
+const quotaAtteint = (status: number | string, texte: string) =>
+  Number(status) === 429 || /MYMEMORY WARNING|USED ALL AVAILABLE/i.test(texte);
+
 async function myMemoryChunk(text: string, to: string): Promise<string> {
-  const url = `${MYMEMORY}?${new URLSearchParams({ q: text, langpair: `fr|${to}` })}`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
-  if (!res.ok) throw new Error(`MyMemory HTTP ${res.status}`);
-  const data = (await res.json()) as {
-    responseStatus: number | string;
-    responseData?: { translatedText?: string };
-  };
-  const t = data.responseData?.translatedText;
-  if (Number(data.responseStatus) !== 200 || !t) {
-    throw new Error(`MyMemory ${data.responseStatus}`);
+  const liste = emails();
+  // Sans email configuré : mode anonyme (quota réduit).
+  const candidats: (string | null)[] = liste.length ? liste : [null];
+
+  let derniere = "MyMemory : quota épuisé pour tous les emails";
+  for (let i = 0; i < candidats.length; i++) {
+    const email = candidats[(curseur + i) % candidats.length];
+    if (email && epuises.get(email) === jour()) continue;
+
+    const params = new URLSearchParams({ q: text, langpair: `fr|${to}` });
+    if (email) params.set("de", email);
+    const res = await fetch(`${MYMEMORY}?${params}`, {
+      signal: AbortSignal.timeout(15000),
+    });
+    if (res.status === 429) {
+      if (email) epuises.set(email, jour());
+      derniere = "MyMemory HTTP 429";
+      continue;
+    }
+    if (!res.ok) throw new Error(`MyMemory HTTP ${res.status}`);
+
+    const data = (await res.json()) as {
+      responseStatus: number | string;
+      responseData?: { translatedText?: string };
+    };
+    const t = data.responseData?.translatedText ?? "";
+    if (quotaAtteint(data.responseStatus, t)) {
+      if (email) epuises.set(email, jour());
+      derniere = "MyMemory : quota quotidien atteint";
+      continue;
+    }
+    if (Number(data.responseStatus) !== 200 || !t) {
+      throw new Error(`MyMemory ${data.responseStatus}`);
+    }
+    curseur = (curseur + i) % candidats.length; // on reste sur l'email qui marche
+    return t;
   }
-  return t;
+  throw new Error(derniere);
 }
 
 async function myMemory(text: string, to: string): Promise<string> {
@@ -114,15 +161,24 @@ async function myMemory(text: string, to: string): Promise<string> {
       continue;
     }
     const parts: string[] = [];
-    for (const c of sentenceChunks(line)) parts.push(await myMemoryChunk(c, to));
-    lines.push(parts.join(" ").replace(/\s{2,}/g, " ").trim());
+    for (const c of sentenceChunks(line))
+      parts.push(await myMemoryChunk(c, to));
+    lines.push(
+      parts
+        .join(" ")
+        .replace(/\s{2,}/g, " ")
+        .trim(),
+    );
   }
   return lines.join("\n");
 }
 
 // ---------- API publique ----------
 
-export async function translateText(text: string, to: LangCode): Promise<string> {
+export async function translateText(
+  text: string,
+  to: LangCode,
+): Promise<string> {
   if (!text.trim()) return "";
   try {
     return await google(text, to);
