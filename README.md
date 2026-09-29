@@ -66,7 +66,7 @@ Corrections de vocabulaire par langue, appliquées après chaque traduction (par
 Prérequis : **Node.js 20.9 ou plus récent** (testé avec Node 22) et npm.
 
 ```bash
-git clone https://github.com/VOTRE-PSEUDO/metro-trad.git
+git clone https://github.com/zkTXT/metro-trad.git
 cd metro-trad
 npm install
 ```
