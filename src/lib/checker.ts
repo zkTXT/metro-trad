@@ -7,7 +7,14 @@ export interface Issue {
   champ: "titre" | "description";
   extrait: string;
   raison: string;
-  categorie: "variante" | "option" | "mot" | "boutique" | "longueur";
+  categorie:
+    | "variante"
+    | "option"
+    | "reference"
+    | "marketing"
+    | "mot"
+    | "boutique"
+    | "longueur";
   supprime: boolean;
 }
 
@@ -31,6 +38,7 @@ const compile = (motif: string) => new RegExp(motif, "i");
 const tidy = (s: string) =>
   s
     .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
     .replace(/\s+([,.])/g, "$1")
     .replace(/([,;:])\s*([.!?])/g, "$2")
     .replace(/([.!?])(\s*[.!?])+/g, "$1")
@@ -113,6 +121,13 @@ function couperFinPendante(s: string): string {
   }
 }
 
+// Quand une phrase est supprimée, ses retours à la ligne finaux restent : sinon le
+// paragraphe ou le titre de rubrique suivant remonterait sur la ligne précédente.
+function retoursALaLigne(sentence: string): string {
+  const fin = sentence.match(/\s*$/)?.[0] ?? "";
+  return fin.replace(/[^\n]/g, "");
+}
+
 // Découpe en phrases en gardant la ponctuation et les retours à la ligne.
 function splitSentences(text: string): string[] {
   // On ne coupe qu'après un point suivi d'un espace ou de la fin : « bistromania.fr »
@@ -149,10 +164,10 @@ function checkField(
         champ,
         extrait: sentence.trim(),
         raison: rule.raison,
-        categorie: rule.categorie as "variante" | "option",
+        categorie: rule.categorie as Issue["categorie"],
         supprime: mode === "supprimer",
       });
-      if (mode === "signaler") kept.push(sentence);
+      kept.push(mode === "signaler" ? sentence : retoursALaLigne(sentence));
     } else {
       kept.push(sentence);
     }
@@ -221,8 +236,8 @@ function checkField(
       });
     }
     if (!supprimer) sortie.push(sentence);
-    else if (!phraseEntiere)
-      sortie.push(champ === "titre" ? couperFinPendante(s) : s);
+    else if (phraseEntiere) sortie.push(retoursALaLigne(sentence));
+    else sortie.push(champ === "titre" ? couperFinPendante(s) : s);
   }
   let out = sortie.join("");
 

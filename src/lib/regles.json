@@ -32,6 +32,26 @@
       "motif": "(accessoires?|pièces?) (en option|supplémentaires?|complémentaires?)",
       "raison": "Composant optionnel mentionné",
       "categorie": "option"
+    },
+    {
+      "motif": "plusieurs (couleurs?|coloris|dimensions?|tailles?|modèles?|versions?|finitions?|références?)|en version (chaise|fauteuil|tabouret|banquette|table)|(cette|la|toute la) (gamme|collection|série)\\b",
+      "raison": "Variante ou gamme mentionnée",
+      "categorie": "variante"
+    },
+    {
+      "motif": "\\b(découvrez|retrouvez|consultez|visitez|explorez)\\b|(peut|peuvent) être (associ|assorti|combin|complét)[a-zéèêë]*\\s+(à|avec|au|aux)(?=\\s)",
+      "raison": "Renvoi vers d'autres produits",
+      "categorie": "reference"
+    },
+    {
+      "motif": "\\b(notre|nos) (site|catalogue|boutique|magasin|gamme|collection|marketplace|produits?|articles?|modèles?|chaises?|fauteuils?|tables?|tabourets?|banquettes?|meubles?|mobilier)\\b|\\bdans (notre|nos) |\\b(https?://|www\\.)\\S+|\\b(site (web|internet)|catalogue|marketplace)\\b",
+      "raison": "Référence à la boutique, au catalogue ou à un site",
+      "categorie": "reference"
+    },
+    {
+      "motif": "vous allez adorer|produit parfait|qualité exceptionnelle|une révolution|il y aura forcément|forcément une",
+      "raison": "Formulation publicitaire excessive",
+      "categorie": "marketing"
     }
   ],
   "messageMetro": "Veuillez noter que, pour le moment, vous ne pouvez pas présenter des composants optionnels (accessoires, pièces supplémentaires…) et variantes (autres tailles, couleurs...) pour un produit. Par conséquent, veuillez supprimer les informations relatives aux variantes et/ou aux composants optionnels qui ne sont pas déjà inclus dans l'offre. Si vous souhaitez proposer ces éléments, veuillez les soumettre en tant que produits seuls."
