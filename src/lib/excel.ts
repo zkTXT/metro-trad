@@ -1,6 +1,6 @@
 // Lecture / écriture des fichiers Excel, entièrement dans le navigateur
 // (le fichier n'est jamais envoyé au serveur).
-import type { Workbook, Worksheet } from "exceljs";
+import type { Row, Workbook, Worksheet } from "exceljs";
 import { CONSIGNES_SECURITE } from "./consignes";
 import { LANGUES, type LangCode } from "./translate";
 
@@ -98,6 +98,8 @@ export interface ResultatLigne {
     string,
     { titre: string; description: string } | { error: string }
   >;
+  /** Modèle Metro : pour chaque langue, quelles cases écrire (les autres restent intactes). */
+  ecrire?: Record<string, { titre: boolean; description: boolean }>;
 }
 
 // Ajoute des colonnes au classeur d'origine (mise en forme conservée) et renvoie le fichier.
@@ -188,7 +190,12 @@ export interface ModeleMetro {
   langues: Partial<Record<LangCode, { titre: number; description: number }>>;
   colRef: number; // MPN / GTIN / MID, pour l'affichage
   securite: Partial<Record<"fr" | LangCode, number>>; // « Product safety instructions XX »
+  // Colonnes Width / Length / Height (+ unités), pour compléter le titre.
+  dims: Partial<Record<DimCol, number>>;
 }
+
+type DimCol =
+  "width" | "length" | "height" | "widthUnit" | "lengthUnit" | "heightUnit";
 
 export function detecterModeleMetro(ws: Worksheet): ModeleMetro | null {
   const largeur = Math.max(ws.actualColumnCount, ws.columnCount);
@@ -198,8 +205,14 @@ export function detecterModeleMetro(ws: Worksheet): ModeleMetro | null {
     const descriptions: Record<string, number> = {};
     let ref = 0;
     const securite: ModeleMetro["securite"] = {};
+    const dims: ModeleMetro["dims"] = {};
     for (let c = 1; c <= largeur; c++) {
       const t = texte(row.getCell(c));
+      const dim = t.match(/^(Width|Length|Height)( unit)?$/i);
+      if (dim) {
+        const cle = (dim[1].toLowerCase() + (dim[2] ? "Unit" : "")) as DimCol;
+        if (!dims[cle]) dims[cle] = c;
+      }
       const sec = t.match(/^Product safety instructions ([A-Z]{2})$/i);
       if (sec) {
         const code = SUFFIXES[sec[1].toUpperCase()];
@@ -231,6 +244,7 @@ export function detecterModeleMetro(ws: Worksheet): ModeleMetro | null {
         langues,
         colRef: ref,
         securite,
+        dims,
       };
     }
   }
@@ -239,7 +253,21 @@ export function detecterModeleMetro(ws: Worksheet): ModeleMetro | null {
 
 export interface LigneMetro extends LigneSource {
   ref: string;
+  dimensions: string | null; // « 44 x 44 x 110 cm » d'après les colonnes Width/Length/Height
   existant: Partial<Record<LangCode, { titre: string; description: string }>>;
+}
+
+// Largeur x profondeur x hauteur, uniquement si les trois valeurs sont là et en cm.
+function dimensionsMetro(row: Row, m: ModeleMetro): string | null {
+  const { width, length, height } = m.dims;
+  if (!width || !length || !height) return null;
+  const val = (c: number) => texte(row.getCell(c)).replace(/\s/g, "");
+  const [w, l, h] = [val(width), val(length), val(height)];
+  if (![w, l, h].every((v) => /^\d+(?:[.,]\d+)?$/.test(v))) return null;
+  const unites = [m.dims.widthUnit, m.dims.lengthUnit, m.dims.heightUnit];
+  if (unites.some((c) => c && texte(row.getCell(c)).toLowerCase() !== "cm"))
+    return null;
+  return `${w} x ${l} x ${h} cm`;
 }
 
 export function lireLignesMetro(ws: Worksheet, m: ModeleMetro): LigneMetro[] {
@@ -261,6 +289,7 @@ export function lireLignesMetro(ws: Worksheet, m: ModeleMetro): LigneMetro[] {
       titre,
       description,
       ref: m.colRef ? texte(row.getCell(m.colRef)) : "",
+      dimensions: dimensionsMetro(row, m),
       existant,
     });
   }
@@ -295,8 +324,10 @@ export async function exporterMetro(
     for (const [code, t] of Object.entries(res.traductions ?? {})) {
       const cols = m.langues[code as LangCode];
       if (!cols || "error" in t) continue;
-      row.getCell(cols.titre).value = t.titre || null;
-      row.getCell(cols.description).value = t.description || null;
+      const champs = res.ecrire?.[code] ?? { titre: true, description: true };
+      if (champs.titre) row.getCell(cols.titre).value = t.titre || null;
+      if (champs.description)
+        row.getCell(cols.description).value = t.description || null;
     }
   }
   return new Blob([await wb.xlsx.writeBuffer()], { type: XLSX_TYPE });

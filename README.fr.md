@@ -115,7 +115,9 @@ Toutes les règles sont dans **`src/lib/regles.json`**, modifiable sans toucher 
 | `messageMetro` | Message type affiché quand une variante ou une option est détectée. |
 
 Comportements à connaître :
-- Un texte **sans aucun problème est renvoyé identique, au caractère près**.
+- Une description **sans aucun problème est renvoyée identique, au caractère près**.
+- **Mise en forme du titre** (mécanique, sans IA) : les tirets qui séparent les attributs (`Chaise YORK - Marron - Pieds noirs`) deviennent des virgules (`Chaise YORK, marron, pieds noirs`), l'apostrophe devient typographique, et les dimensions sont ajoutées ou remises au format en fin de titre : ` – 44 x 44 x 110 cm` (largeur x profondeur x hauteur). Les dimensions ne sont jamais inventées : elles viennent du titre lui-même, des colonnes `Width` / `Length` / `Height` du modèle Metro, ou d'une mention du type `L 56 x P 62 x H 81 cm` dans la description (les valeurs étiquetées sont remises dans le bon ordre ; seul le `cm` est géré). Un titre qui ressemble déjà à `… – 44 x 44 x 110 cm` n'est pas touché. L'outil ne **réordonne pas** un titre et ne devine ni la matière ni la couleur : cela demanderait une IA générative.
+- Dans le modèle Metro, chaque champ est traité séparément : un titre reformaté est retraduit, mais une description inchangée conserve ses traductions existantes.
 - Quand retirer un mot laisserait un fragment orphelin (par exemple « sur. »), la phrase entière est supprimée dans une description ; dans un titre, seuls les mots pendants en fin de titre sont retirés.
 - Les longueurs ne sont jamais corrigées automatiquement : un titre trop long est signalé.
 - Le moteur ne trouve que ce qui figure dans les règles. **Ajoutez vos propres refus METRO** au fil du temps.

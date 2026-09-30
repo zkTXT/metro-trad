@@ -1,4 +1,5 @@
 import regles from "./regles.json";
+import { extraireDimensions, soignerTitre } from "./titre";
 
 export type Mode = "supprimer" | "signaler";
 export type Verdict = "valide" | "a_verifier" | "refuse";
@@ -12,6 +13,7 @@ export interface Issue {
     | "option"
     | "reference"
     | "marketing"
+    | "titre"
     | "mot"
     | "boutique"
     | "longueur";
@@ -258,13 +260,47 @@ function checkField(
   return { original: text, nettoye: out, issues };
 }
 
+export interface OptionsProduit {
+  /** Dimensions connues par ailleurs (ex. colonnes du modèle Metro), « 44 x 44 x 110 cm ». */
+  dimensions?: string | null;
+}
+
 export function checkProduct(
   titre: string,
   description: string,
   mode: Mode = "supprimer",
+  opts: OptionsProduit = {},
 ): CheckResult {
   const t = checkField("titre", titre, mode);
   const d = checkField("description", description, mode);
+
+  // Mise en forme du titre : tirets remplacés, dimensions ajoutées (jamais inventées).
+  if (mode === "supprimer" && t.nettoye.trim()) {
+    const dims = opts.dimensions || extraireDimensions(d.nettoye);
+    const soigne = soignerTitre(t.nettoye, dims);
+    if (soigne !== t.nettoye) {
+      t.issues.push({
+        champ: "titre",
+        extrait: t.nettoye,
+        raison:
+          "Titre mis en forme (tirets remplacés, dimensions au format « L x P x H cm »)",
+        categorie: "titre",
+        supprime: true,
+      });
+      t.nettoye = soigne;
+    }
+    t.issues = t.issues.filter((i) => i.categorie !== "longueur");
+    if (t.nettoye.length > regles.titreMaxCaracteres) {
+      t.issues.push({
+        champ: "titre",
+        extrait: `${t.nettoye.length} caractères`,
+        raison: `Titre trop long (max ${regles.titreMaxCaracteres})`,
+        categorie: "longueur",
+        supprime: false,
+      });
+    }
+  }
+
   const all = [...t.issues, ...d.issues];
 
   const nonCorrige = all.some((i) => !i.supprime);

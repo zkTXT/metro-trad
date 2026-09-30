@@ -117,7 +117,9 @@ All the rules live in **`src/lib/regles.json`** and can be edited without touchi
 | `messageMetro` | Standard message displayed when a variant or option is detected. |
 
 Behaviours worth knowing:
-- A text **with no problem is returned identical, character for character**.
+- A description **with no problem is returned identical, character for character**.
+- **Title formatting** (mechanical, no AI): separator dashes (`Chair YORK - Brown - Black legs`) become commas (`Chair YORK, brown, black legs`), the apostrophe becomes typographic, and the dimensions are added or reformatted at the end as ` – 44 x 44 x 110 cm` (width x depth x height). The dimensions are never invented: they come from the title itself, from the `Width` / `Length` / `Height` columns of the Metro template, or from a `L 56 x P 62 x H 81 cm` style mention in the description (labelled values are put back in the right order; only `cm` is handled). A title that already looks like `… – 44 x 44 x 110 cm` is left untouched. The tool does **not** reorder a title or guess its material or colour: that would need generative AI.
+- In the Metro template, each field is handled separately: a title that gets reformatted is translated again, but a description that did not change keeps its existing translations.
 - When removing a word would leave an orphan fragment (for example "on."), the whole sentence is removed from a description; in a title, only the dangling words at the end are trimmed.
 - Lengths are never corrected automatically: a title that is too long is flagged.
 - The engine only finds what is in the rules. **Add your own METRO rejections** over time.

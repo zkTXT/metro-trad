@@ -26,6 +26,7 @@ type StatutLigne =
 
 type Ligne = LigneSource & {
   ref?: string;
+  dimensions?: string | null;
   existant?: LigneMetro["existant"];
 };
 
@@ -243,7 +244,9 @@ export default function ImportPage() {
     l: Ligne,
     signal: AbortSignal,
   ): Promise<EtatLigne> {
-    const check = checkProduct(l.titre, l.description, "supprimer");
+    const check = checkProduct(l.titre, l.description, "supprimer", {
+      dimensions: l.dimensions,
+    });
     const listeProblemes = [...check.titre.issues, ...check.description.issues];
     const problemes = listeProblemes
       .map((i) => `${i.champ} : ${i.raison} (« ${i.extrait} »)`)
@@ -267,26 +270,34 @@ export default function ImportPage() {
       };
     }
 
-    // Langues à traduire. Dans le modèle Metro, on ne touche pas aux cases déjà
-    // remplies, sauf si le français a dû être corrigé (les anciennes traductions
-    // contiendraient encore le texte interdit) ou si « remplacer » est coché.
+    // Cases à écrire. Dans le modèle Metro, chaque champ est traité séparément : une
+    // case déjà remplie est conservée, sauf si le français de CE champ a changé (les
+    // anciennes traductions ne correspondraient plus) ou si « remplacer » est coché.
+    // Ainsi, un titre reformaté ne réécrit pas une description déjà validée.
     let cibles: string[] | undefined;
     let conservees: string[] = [];
+    let ecrire: ResultatLigne["ecrire"];
     if (metro) {
+      const titreModifie = check.titre.issues.length > 0;
+      const descModifiee = check.description.issues.length > 0;
       const disponibles = LANGUES.map((x) => x.code as string).filter(
         (c) => metro.langues[c as LangCode],
       );
-      const manque = (c: string) => {
+      ecrire = {};
+      for (const c of disponibles) {
         const e = l.existant?.[c as LangCode];
-        return (
-          (!!base.titreNettoye.trim() && !e?.titre.trim()) ||
-          (!!base.descriptionNettoyee.trim() && !e?.description.trim())
-        );
-      };
-      const aTraduire =
-        ecraser || listeProblemes.length > 0
-          ? disponibles
-          : disponibles.filter(manque);
+        ecrire[c] = {
+          titre:
+            !!base.titreNettoye.trim() &&
+            (ecraser || titreModifie || !e?.titre.trim()),
+          description:
+            !!base.descriptionNettoyee.trim() &&
+            (ecraser || descModifiee || !e?.description.trim()),
+        };
+      }
+      const aTraduire = disponibles.filter(
+        (c) => ecrire![c].titre || ecrire![c].description,
+      );
       cibles = aTraduire;
       conservees = disponibles.filter((c) => !aTraduire.includes(c));
       if (aTraduire.length === 0) {
@@ -316,7 +327,7 @@ export default function ImportPage() {
     const statut = enErreur ? "erreur" : statutVerdict;
     return {
       statut,
-      res: { ...base, statut: LIBELLES[statut].export, traductions },
+      res: { ...base, statut: LIBELLES[statut].export, traductions, ecrire },
       conservees,
       erreur: enErreur
         ? "Une ou plusieurs langues ont échoué : relancez pour les compléter."
