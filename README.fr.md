@@ -111,7 +111,7 @@ Toutes les règles sont dans **`src/lib/regles.json`**, modifiable sans toucher 
 | `titreMaxCaracteres`, `descriptionMaxCaracteres` | Longueurs maximales. **Valeurs d'exemple : remplacez-les par celles de METRO.** |
 | `boutique` | Noms de votre boutique à ne jamais citer (le nom et ses variantes, adresse web incluse). **À remplacer par le vôtre.** |
 | `motsInterdits` | Mots ou expressions (expressions régulières) retirés du texte, avec la raison affichée. |
-| `phrasesInterdites` | Motifs qui font supprimer la **phrase entière** (variantes, options : « existe aussi en… », « en option », « vendu séparément »…). |
+| `phrasesInterdites` | Motifs qui font supprimer la **phrase entière** (variantes et gammes : « existe en plusieurs couleurs »… ; options : « en option », « vendu séparément »… ; renvois vers d'autres produits, le site ou le catalogue : « découvrez également… », « retrouvez… », « nos fauteuils… », « notre gamme » ; formules trop publicitaires : « vous allez adorer »…). Chaque règle a une catégorie (`variante`, `option`, `reference`, `marketing`). |
 | `messageMetro` | Message type affiché quand une variante ou une option est détectée. |
 
 Comportements à connaître :

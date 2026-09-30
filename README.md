@@ -113,7 +113,7 @@ All the rules live in **`src/lib/regles.json`** and can be edited without touchi
 | `titreMaxCaracteres`, `descriptionMaxCaracteres` | Maximum lengths. **Example values: replace them with METRO's actual limits.** |
 | `boutique` | Names of your shop that must never appear (the name and its variants, including the web address). **Replace with your own.** |
 | `motsInterdits` | Words or expressions (regular expressions) removed from the text, with the reason shown to the user. |
-| `phrasesInterdites` | Patterns that cause the **whole sentence** to be removed (variants, options: "also available in…", "optional", "sold separately"…). |
+| `phrasesInterdites` | Patterns that cause the **whole sentence** to be removed (variants and ranges: "exists in several colours"…; options: "optional", "sold separately"…; references to other products, the website or the catalogue: "discover also…", "find…", "our armchairs…", "our range"; over-the-top promotional wording: "you will love it"…). Each rule has a category (`variante`, `option`, `reference`, `marketing`). |
 | `messageMetro` | Standard message displayed when a variant or option is detected. |
 
 Behaviours worth knowing:
