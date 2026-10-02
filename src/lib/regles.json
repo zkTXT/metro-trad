@@ -1,6 +1,6 @@
 {
   "titreMaxCaracteres": 150,
-  "descriptionMaxCaracteres": 2000,
+  "descriptionMaxCaracteres": 4000,
   "boutique": ["bistromania.fr", "Bistromania", "Bistro Mania"],
   "motsInterdits": [
     { "motif": "promo(tion)?s?", "raison": "Mention promotionnelle interdite" },
