@@ -84,6 +84,7 @@ cp .env.example .env.local
 | Variable | Rôle |
 |---|---|
 | `MYMEMORY_EMAILS` | Adresses email (séparées par des virgules) utilisées pour identifier vos requêtes auprès de MyMemory, le moteur de secours. Chaque adresse donne un quota quotidien ; la suivante prend le relais quand l'une est épuisée. Facultatif : sans email, le quota anonyme (beaucoup plus faible) s'applique. |
+| `AZURE_TRANSLATOR_KEY`, `AZURE_TRANSLATOR_REGION` | Facultatif. Clé et région d'une ressource Azure Translator (niveau gratuit F0 recommandé). Si elles sont renseignées, Azure est utilisé en premier. `AZURE_TRANSLATOR_ENDPOINT` permet de changer le point de terminaison par défaut. |
 
 `.env.local` est ignoré par git : il ne sera jamais publié. **Redémarrez le serveur après toute modification.**
 
@@ -126,8 +127,11 @@ Comportements à connaître :
 ## Traduction : moteurs, quotas, mémoire, glossaire
 
 ### Moteurs
-1. **Google Traduction** (point d'accès gratuit non officiel, sans clé) : moteur principal, meilleure qualité.
-2. **MyMemory** (gratuit) : moteur de secours, utilisé quand Google refuse. Qualité un peu moindre.
+1. **Azure Translator** (officiel, *facultatif*) : utilisé en premier si `AZURE_TRANSLATOR_KEY` est renseignée dans `.env.local`. Le niveau gratuit **F0** permet 2 millions de caractères par mois, sans blocage arbitraire, soit environ 300 fiches moyennes par mois dans 6 langues. La création du compte Azure demande normalement une carte bancaire ; le niveau F0 n'est pas facturé, et quand le quota est épuisé les requêtes sont refusées plutôt que facturées. Renseignez aussi `AZURE_TRANSLATOR_REGION` (par exemple `westeurope`).
+2. **Google Traduction** (point d'accès gratuit non officiel, sans clé) : moteur principal si Azure n'est pas configuré, bonne qualité.
+3. **MyMemory** (gratuit) : dernier recours, utilisé quand les autres refusent. Qualité un peu moindre.
+
+Si Azure refuse (quota, clé, trop de requêtes), il est mis en pause un moment et le moteur suivant prend le relais automatiquement.
 
 Google limite le nombre de requêtes par adresse IP (erreur 429). L'outil s'en protège :
 - délai entre les requêtes (300 ms en usage normal, **4 secondes pendant un import Excel**) ;

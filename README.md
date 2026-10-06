@@ -86,6 +86,7 @@ cp .env.example .env.local
 | Variable | Purpose |
 |---|---|
 | `MYMEMORY_EMAILS` | Email addresses (comma-separated) used to identify your requests to MyMemory, the fallback engine. Each address has its own daily quota; the next one takes over when one is used up. Optional: without any email, the (much smaller) anonymous quota applies. |
+| `AZURE_TRANSLATOR_KEY`, `AZURE_TRANSLATOR_REGION` | Optional. Key and region of an Azure Translator resource (free F0 tier recommended). When set, Azure is used first. `AZURE_TRANSLATOR_ENDPOINT` can override the default endpoint. |
 
 `.env.local` is ignored by git and will never be published. **Restart the server after any change.**
 
@@ -128,8 +129,11 @@ Behaviours worth knowing:
 ## Translation: engines, quotas, memory, glossary
 
 ### Engines
-1. **Google Translate** (free, unofficial endpoint, no key): main engine, best quality.
-2. **MyMemory** (free): fallback engine, used when Google refuses. Slightly lower quality.
+1. **Azure Translator** (official, *optional*): used first when `AZURE_TRANSLATOR_KEY` is set in `.env.local`. The free **F0** tier allows 2 million characters per month with no arbitrary blocking, which is roughly 300 average listings per month in 6 languages. Creating the Azure account normally requires a payment card; the F0 tier is not billed, and when the quota is used up requests are refused rather than charged. Set `AZURE_TRANSLATOR_REGION` too (for example `westeurope`).
+2. **Google Translate** (free, unofficial endpoint, no key): main engine when Azure is not configured, good quality.
+3. **MyMemory** (free): last-resort fallback, used when the others refuse. Slightly lower quality.
+
+If Azure refuses (quota, key, rate limit), it is paused for a while and the next engine takes over automatically.
 
 Google limits the number of requests per IP address (HTTP 429 error). The tool protects itself:
 - a delay between requests (300 ms in normal use, **4 seconds during an Excel import**);

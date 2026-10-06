@@ -219,6 +219,85 @@ async function myMemory(text: string, to: string): Promise<string> {
   return lines.join("\n");
 }
 
+// ---------- Moteur 0 : Azure Translator (officiel, optionnel) ----------
+// Utilisé en premier uniquement si AZURE_TRANSLATOR_KEY est renseignée dans .env.local.
+// Niveau gratuit F0 : 2 millions de caractères par mois, sans blocage arbitraire.
+
+const azureConfig = () => {
+  const key = process.env.AZURE_TRANSLATOR_KEY?.trim();
+  if (!key) return null;
+  return {
+    key,
+    region: process.env.AZURE_TRANSLATOR_REGION?.trim(),
+    endpoint: (
+      process.env.AZURE_TRANSLATOR_ENDPOINT?.trim() ||
+      "https://api.cognitive.microsofttranslator.com"
+    ).replace(/\/$/, ""),
+  };
+};
+
+const AZURE_CODES: Record<string, string> = { "pt-PT": "pt-pt" };
+const AZURE_LOT_ELEMENTS = 100;
+const AZURE_LOT_CARACTERES = 40000;
+let azurePauseJusqua = 0; // quota dépassé, clé refusée ou trop de requêtes : on n'insiste pas
+
+async function azure(text: string, to: string): Promise<string> {
+  const cfg = azureConfig();
+  if (!cfg) throw new Error("Azure non configuré");
+  if (Date.now() < azurePauseJusqua) throw new Error("Azure en pause");
+
+  // Un élément par ligne : la correspondance ligne à ligne est garantie par l'API.
+  const lignes = text.split("\n");
+  const aTraduire = lignes
+    .map((l, i) => (l.trim() ? i : -1))
+    .filter((i) => i >= 0);
+  const sortie = [...lignes];
+
+  for (let debut = 0; debut < aTraduire.length;) {
+    let fin = debut;
+    let taille = 0;
+    while (
+      fin < aTraduire.length &&
+      fin - debut < AZURE_LOT_ELEMENTS &&
+      taille + lignes[aTraduire[fin]].length <= AZURE_LOT_CARACTERES
+    ) {
+      taille += lignes[aTraduire[fin]].length;
+      fin++;
+    }
+    if (fin === debut) fin = debut + 1;
+    const lot = aTraduire.slice(debut, fin);
+
+    const res = await fetch(
+      `${cfg.endpoint}/translate?api-version=3.0&from=fr&to=${AZURE_CODES[to] ?? to}&textType=plain`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Ocp-Apim-Subscription-Key": cfg.key,
+          ...(cfg.region ? { "Ocp-Apim-Subscription-Region": cfg.region } : {}),
+        },
+        body: JSON.stringify(lot.map((i) => ({ Text: lignes[i] }))),
+        signal: AbortSignal.timeout(20000),
+      },
+    );
+    if (res.status === 401 || res.status === 403 || res.status === 429) {
+      azurePauseJusqua =
+        Date.now() + (res.status === 429 ? 60 * 1000 : 60 * 60 * 1000);
+      throw new Error(`Azure HTTP ${res.status}`);
+    }
+    if (!res.ok) throw new Error(`Azure HTTP ${res.status}`);
+
+    const data = (await res.json()) as { translations?: { text: string }[] }[];
+    lot.forEach((i, k) => {
+      const t = data[k]?.translations?.[0]?.text;
+      if (!t) throw new Error("Azure : traduction vide");
+      sortie[i] = t;
+    });
+    debut = fin;
+  }
+  return sortie.join("\n");
+}
+
 // ---------- API publique ----------
 
 export interface OptionsMoteur {
@@ -226,21 +305,25 @@ export interface OptionsMoteur {
   cooldownMs?: number;
 }
 
+// Ordre : Azure (si configuré), puis Google, puis MyMemory.
 export async function traduireBrut(
   text: string,
   to: LangCode,
   opts: OptionsMoteur = {},
 ): Promise<string> {
   if (!text.trim()) return "";
-  try {
-    return await google(text, to, opts.cooldownMs ?? ESPACEMENT_MS);
-  } catch (googleError) {
+  const moteurs: (() => Promise<string>)[] = [];
+  if (azureConfig()) moteurs.push(() => azure(text, to));
+  moteurs.push(() => google(text, to, opts.cooldownMs ?? ESPACEMENT_MS));
+  moteurs.push(() => myMemory(text, to));
+
+  const erreurs: string[] = [];
+  for (const moteur of moteurs) {
     try {
-      return await myMemory(text, to);
-    } catch (fallbackError) {
-      const a = googleError instanceof Error ? googleError.message : "?";
-      const b = fallbackError instanceof Error ? fallbackError.message : "?";
-      throw new Error(`${a} ; ${b}`);
+      return await moteur();
+    } catch (e) {
+      erreurs.push(e instanceof Error ? e.message : "erreur inconnue");
     }
   }
+  throw new Error(erreurs.join(" ; "));
 }
