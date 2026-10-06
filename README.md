@@ -129,7 +129,7 @@ Behaviours worth knowing:
 ## Translation: engines, quotas, memory, glossary
 
 ### Engines
-1. **Azure Translator** (official, *optional*): used first when `AZURE_TRANSLATOR_KEY` is set in `.env.local`. The free **F0** tier allows 2 million characters per month with no arbitrary blocking, which is roughly 300 average listings per month in 6 languages. Creating the Azure account normally requires a payment card; the F0 tier is not billed, and when the quota is used up requests are refused rather than charged. Set `AZURE_TRANSLATOR_REGION` too (for example `westeurope`).
+1. **Azure Translator** (official, *optional*): used first when `AZURE_TRANSLATOR_KEY` is set in `.env.local`. The free **F0** tier allows 2 million characters per month with no arbitrary blocking, which is roughly 300 average listings per month in 6 languages. Creating the Azure account normally requires a payment card; according to a Microsoft support answer, exceeding the F0 monthly quota returns an error (`403001`) until the next month instead of billing you, and you must upgrade yourself to pay. This is not stated on the pricing page, so check your own account (Azure Cost Management: set a small budget alert) and make sure the pricing tier is *Free F0*. Set `AZURE_TRANSLATOR_REGION` too (for example `westeurope`).
 2. **Google Translate** (free, unofficial endpoint, no key): main engine when Azure is not configured, good quality.
 3. **MyMemory** (free): last-resort fallback, used when the others refuse. Slightly lower quality.
 

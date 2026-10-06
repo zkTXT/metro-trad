@@ -127,7 +127,7 @@ Comportements à connaître :
 ## Traduction : moteurs, quotas, mémoire, glossaire
 
 ### Moteurs
-1. **Azure Translator** (officiel, *facultatif*) : utilisé en premier si `AZURE_TRANSLATOR_KEY` est renseignée dans `.env.local`. Le niveau gratuit **F0** permet 2 millions de caractères par mois, sans blocage arbitraire, soit environ 300 fiches moyennes par mois dans 6 langues. La création du compte Azure demande normalement une carte bancaire ; le niveau F0 n'est pas facturé, et quand le quota est épuisé les requêtes sont refusées plutôt que facturées. Renseignez aussi `AZURE_TRANSLATOR_REGION` (par exemple `westeurope`).
+1. **Azure Translator** (officiel, *facultatif*) : utilisé en premier si `AZURE_TRANSLATOR_KEY` est renseignée dans `.env.local`. Le niveau gratuit **F0** permet 2 millions de caractères par mois, sans blocage arbitraire, soit environ 300 fiches moyennes par mois dans 6 langues. La création du compte Azure demande normalement une carte bancaire ; d'après une réponse du support Microsoft, dépasser le quota mensuel F0 renvoie une erreur (`403001`) jusqu'au mois suivant au lieu de vous facturer, et il faut passer soi-même en offre payante pour continuer. Ce n'est pas écrit sur la page des tarifs : vérifiez sur votre propre compte (Azure Cost Management : créez une petite alerte de budget) et assurez-vous que le niveau est bien *Free F0*. Renseignez aussi `AZURE_TRANSLATOR_REGION` (par exemple `westeurope`).
 2. **Google Traduction** (point d'accès gratuit non officiel, sans clé) : moteur principal si Azure n'est pas configuré, bonne qualité.
 3. **MyMemory** (gratuit) : dernier recours, utilisé quand les autres refusent. Qualité un peu moindre.
 
